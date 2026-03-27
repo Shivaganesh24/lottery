@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -14,7 +13,7 @@ import { useAuth, useFirestore, useUser } from '@/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { ShieldAlert, Loader2 } from 'lucide-react';
+import { ShieldAlert, Loader2, ArrowLeft } from 'lucide-react';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export default function SignupPage() {
@@ -106,136 +105,123 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-background">
-      {/* Form Side */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-12">
-        <div className="w-full max-w-md space-y-8 animate-in fade-in slide-in-from-left-4 duration-700">
-          <div className="text-center lg:text-left">
-            <Link href="/" className="inline-flex items-center gap-2 mb-8 group">
-              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform">FF</div>
-              <span className="text-3xl font-bold tracking-tight text-primary">FairwayFortune</span>
-            </Link>
-            <h1 className="text-4xl font-bold tracking-tight mb-2">Create Account</h1>
-            <p className="text-muted-foreground">Start turning your golf scores into charitable winnings.</p>
-          </div>
-
-          <Card className="border-none shadow-2xl bg-white rounded-[2rem] overflow-hidden">
-            <form onSubmit={handleSignup}>
-              <CardHeader className="p-8 pb-4">
-                <CardTitle className="text-2xl">Sign Up</CardTitle>
-                <CardDescription>Enter your details to get started.</CardDescription>
-              </CardHeader>
-              <CardContent className="p-8 pt-0 space-y-5">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="first-name">First Name</Label>
-                    <Input 
-                      id="first-name" 
-                      placeholder="John" 
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      required
-                      className="h-11 bg-secondary/30 border-none rounded-xl"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="last-name">Last Name</Label>
-                    <Input 
-                      id="last-name" 
-                      placeholder="Doe" 
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      required
-                      className="h-11 bg-secondary/30 border-none rounded-xl"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input 
-                    id="email" 
-                    type="email" 
-                    placeholder="john@example.com" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="h-11 bg-secondary/30 border-none rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input 
-                    id="password" 
-                    type="password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="h-11 bg-secondary/30 border-none rounded-xl"
-                  />
-                </div>
-
-                <div className="flex items-center space-x-2 pt-4 border-t border-dashed mt-4">
-                  <Checkbox 
-                    id="admin-reg" 
-                    checked={isAdminRegistration}
-                    onCheckedChange={(checked) => setIsAdminRegistration(!!checked)}
-                    className="rounded-md"
-                  />
-                  <div className="grid gap-1.5 leading-none">
-                    <Label 
-                      htmlFor="admin-reg" 
-                      className="text-sm font-bold leading-none flex items-center gap-1.5 text-accent"
-                    >
-                      <ShieldAlert className="h-4 w-4" /> Administrative Access (Dev)
-                    </Label>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2 pt-2">
-                  <Checkbox id="terms" required className="rounded-md" />
-                  <Label htmlFor="terms" className="text-xs text-muted-foreground font-normal leading-none cursor-pointer">
-                    I agree to the <Link href="#" className="text-primary hover:underline">Terms</Link> and <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>.
-                  </Label>
-                </div>
-                <Button 
-                  type="submit"
-                  className="w-full bg-primary hover:bg-primary/90 h-12 rounded-xl text-lg font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] mt-2"
-                  disabled={isLoading}
-                >
-                  {isLoading ? <Loader2 className="animate-spin" /> : 'Get Started'}
-                </Button>
-              </CardContent>
-            </form>
-            <CardFooter className="px-8 pb-8">
-              <p className="text-center text-sm text-muted-foreground w-full">
-                Already registered? <Link href="/login" className="text-primary hover:underline font-bold">Log in here</Link>
-              </p>
-            </CardFooter>
-          </Card>
-        </div>
-      </div>
-
-      {/* Visual Side */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-black">
-        {signupImage && (
+    <div className="min-h-screen relative flex items-center justify-center p-6 overflow-hidden">
+      {/* Background Image */}
+      {signupImage && (
+        <div className="absolute inset-0 z-0">
           <Image 
             src={signupImage.imageUrl} 
             alt={signupImage.description} 
             fill 
-            className="object-cover opacity-80"
+            className="object-cover"
             data-ai-hint={signupImage.imageHint}
             priority
           />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-l from-black/70 to-transparent" />
-        <div className="relative z-10 p-20 flex flex-col justify-end text-white text-right w-full">
-          <div className="flex items-center justify-end gap-3 mb-6">
-            <span className="text-4xl font-extrabold tracking-tighter">FairwayFortune</span>
-            <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center text-white font-bold text-2xl shadow-xl shadow-accent/20">FF</div>
-          </div>
-          <h2 className="text-6xl font-extrabold leading-tight mb-6">Play with Purpose.<br /><span className="text-accent italic underline decoration-accent/30 underline-offset-8">Win for All.</span></h2>
-          <p className="text-xl text-zinc-300 max-w-md ml-auto">Join thousands of golfers worldwide who are turning their game into a powerful tool for global charitable impact.</p>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" />
         </div>
+      )}
+
+      {/* Floating Logo */}
+      <Link href="/" className="absolute top-8 left-8 z-20 flex items-center gap-2 text-white group">
+        <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform shadow-lg shadow-accent/20">FF</div>
+        <span className="font-bold hidden sm:inline text-xl tracking-tight">FairwayFortune</span>
+      </Link>
+
+      <div className="w-full max-w-lg relative z-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
+        <Card className="border-none shadow-2xl bg-white/95 backdrop-blur-xl rounded-[2.5rem] overflow-hidden">
+          <form onSubmit={handleSignup}>
+            <CardHeader className="p-8 pb-4 text-center">
+              <CardTitle className="text-3xl font-bold tracking-tight">Create Account</CardTitle>
+              <CardDescription className="text-base">Join the modern golf prizes community today.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-8 pt-0 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="first-name">First Name</Label>
+                  <Input 
+                    id="first-name" 
+                    placeholder="John" 
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    className="h-11 bg-secondary/30 border-none rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="last-name">Last Name</Label>
+                  <Input 
+                    id="last-name" 
+                    placeholder="Doe" 
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                    className="h-11 bg-secondary/30 border-none rounded-xl"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="john@example.com" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="h-11 bg-secondary/30 border-none rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input 
+                  id="password" 
+                  type="password" 
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="h-11 bg-secondary/30 border-none rounded-xl"
+                />
+              </div>
+
+              <div className="flex items-center space-x-2 pt-4 border-t border-secondary/50 mt-4">
+                <Checkbox 
+                  id="admin-reg" 
+                  checked={isAdminRegistration}
+                  onCheckedChange={(checked) => setIsAdminRegistration(!!checked)}
+                  className="rounded-md"
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <Label 
+                    htmlFor="admin-reg" 
+                    className="text-sm font-bold leading-none flex items-center gap-1.5 text-accent"
+                  >
+                    <ShieldAlert className="h-4 w-4" /> Administrative Access (Dev Only)
+                  </Label>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 pt-2">
+                <Checkbox id="terms" required className="rounded-md" />
+                <Label htmlFor="terms" className="text-xs text-muted-foreground font-normal leading-none cursor-pointer">
+                  I agree to the <Link href="#" className="text-primary hover:underline">Terms of Service</Link> and <Link href="#" className="text-primary hover:underline">Privacy Policy</Link>.
+                </Label>
+              </div>
+              <Button 
+                type="submit"
+                className="w-full bg-primary hover:bg-primary/90 h-14 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 transition-all hover:scale-[1.02] mt-4"
+                disabled={isLoading}
+              >
+                {isLoading ? <Loader2 className="animate-spin" /> : 'Get Started Now'}
+              </Button>
+            </CardContent>
+          </form>
+          <CardFooter className="px-8 pb-8 text-center border-t border-secondary/20 pt-6">
+            <p className="text-sm text-muted-foreground w-full">
+              Already have an account? <Link href="/login" className="text-primary hover:underline font-bold">Sign in here</Link>
+            </p>
+          </CardFooter>
+        </Card>
       </div>
     </div>
   );
