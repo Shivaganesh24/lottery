@@ -1,6 +1,8 @@
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Trophy, Target, Heart, ArrowRight, Play } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 export default function Home() {
   return (
@@ -26,27 +28,29 @@ export default function Home() {
       </header>
 
       <main className="flex-1">
-        <section className="relative min-h-[85vh] flex items-center py-24 px-6 overflow-hidden bg-black">
-          {/* Video Background */}
+        <section className="relative min-h-[90vh] flex items-center py-24 px-6 overflow-hidden bg-black">
+          {/* Video Background Container */}
           <div className="absolute inset-0 z-0">
             <video
               autoPlay
               loop
               muted
               playsInline
-              className="w-full h-full object-cover opacity-60 grayscale-[0.3]"
+              className="w-full h-full object-cover opacity-60"
             >
               <source src="https://assets.mixkit.co/videos/preview/mixkit-golf-ball-rolling-into-the-hole-in-the-green-grass-41220-large.mp4" type="video/mp4" />
+              Your browser does not support the video tag.
             </video>
-            <div className="absolute inset-0 bg-gradient-to-r from-black via-black/40 to-transparent" />
+            {/* Overlay Gradients for Readability */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
           </div>
 
           <div className="max-w-5xl mx-auto relative z-10 text-left md:text-center w-full">
-            <Badge className="mb-4 bg-accent/20 text-accent border-accent/30 backdrop-blur-sm px-3 py-1">
-              <Trophy className="h-3 w-3 mr-2" /> Win Premium Golf Gear Monthly
+            <Badge className="mb-6 bg-accent/20 text-accent border-accent/30 backdrop-blur-sm px-4 py-1.5 text-sm">
+              <Trophy className="h-3.5 w-3.5 mr-2" /> Win Premium Golf Gear Monthly
             </Badge>
-            <h1 className="text-5xl md:text-8xl font-extrabold tracking-tight mb-6 text-white leading-[1.1]">
+            <h1 className="text-5xl md:text-8xl font-extrabold tracking-tight mb-6 text-white leading-[1.05]">
               Your Best Scores,<br />
               <span className="text-accent italic">Real World</span> Rewards.
             </h1>
@@ -55,12 +59,12 @@ export default function Home() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/signup">
-                <Button size="lg" className="h-14 px-10 text-lg bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20">
+                <Button size="lg" className="h-14 px-10 text-lg bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 transition-all hover:scale-105">
                   Start Playing <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
               <Link href="/login">
-                <Button variant="outline" size="lg" className="h-14 px-10 text-lg bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20">
+                <Button variant="outline" size="lg" className="h-14 px-10 text-lg bg-white/10 backdrop-blur-md border-white/20 text-white hover:bg-white/20 transition-all">
                   <Play className="mr-2 h-5 w-5 fill-current" /> Watch How it Works
                 </Button>
               </Link>
@@ -158,5 +162,3 @@ export default function Home() {
     </div>
   );
 }
-
-import { Badge } from '@/components/ui/badge';
