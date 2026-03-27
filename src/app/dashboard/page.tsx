@@ -1,8 +1,8 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -11,12 +11,13 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Trophy, Calendar, CreditCard, ChevronRight, Heart, Plus, LogOut, ShieldCheck, Lock, Upload, CheckCircle2, Clock, Loader2 } from 'lucide-react';
+import { Trophy, Calendar, CreditCard, ChevronRight, Heart, Plus, LogOut, ShieldCheck, Lock, Upload, CheckCircle2, Clock, Loader2, Target } from 'lucide-react';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { doc, serverTimestamp, collection, query, where } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export default function Dashboard() {
   const { user, isUserLoading } = useUser();
@@ -47,6 +48,8 @@ export default function Dashboard() {
   const [isScoreDialogOpen, setIsScoreDialogOpen] = useState(false);
   const [claimProof, setClaimProof] = useState<string>('');
   const [activeWinningId, setActiveWinningId] = useState<string | null>(null);
+
+  const heroImage = PlaceHolderImages.find(img => img.id === 'golf-course-hero');
 
   useEffect(() => {
     if (mounted && !isUserLoading && !user) {
@@ -130,8 +133,8 @@ export default function Dashboard() {
   const isSubscribed = userProfile.status === 'active';
 
   return (
-    <div className="min-h-screen bg-background">
-      <nav className="bg-white border-b px-6 h-16 flex items-center justify-between sticky top-0 z-40">
+    <div className="min-h-screen bg-background pb-20">
+      <nav className="bg-white border-b px-6 h-16 flex items-center justify-between sticky top-0 z-40 shadow-sm">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">FF</div>
           <span className="text-xl font-bold tracking-tight text-primary">FairwayFortune</span>
@@ -154,12 +157,33 @@ export default function Dashboard() {
       </nav>
 
       <div className="max-w-7xl mx-auto p-6 lg:p-10 space-y-8">
+        {/* Hero Section with Image */}
+        <div className="relative h-[250px] md:h-[350px] w-full rounded-[2rem] overflow-hidden shadow-2xl mb-10 group">
+          {heroImage && (
+            <Image 
+              src={heroImage.imageUrl} 
+              alt={heroImage.description} 
+              fill 
+              className="object-cover transition-transform duration-700 group-hover:scale-105" 
+              priority
+              data-ai-hint={heroImage.imageHint}
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+          <div className="absolute bottom-0 left-0 p-8 md:p-12 text-white">
+            <h1 className="text-3xl md:text-5xl font-bold mb-2">Welcome, {userProfile.firstName}</h1>
+            <p className="text-lg opacity-90 max-w-lg">
+              {isSubscribed 
+                ? "You're all set for the next monthly draw. Keep playing with purpose." 
+                : "Join the pro club today and start turning your weekend rounds into major winnings."}
+            </p>
+          </div>
+        </div>
+
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">
-              Welcome, {userProfile.firstName}. {isSubscribed ? 'Good luck in the next draw!' : 'Join Pro to start winning.'}
-            </p>
+            <h2 className="text-2xl font-bold">Your Performance</h2>
+            <p className="text-muted-foreground text-sm">Track your progress and prize eligibility.</p>
           </div>
           <div className="flex gap-3">
             <Dialog open={isScoreDialogOpen} onOpenChange={setIsScoreDialogOpen}>
@@ -197,7 +221,7 @@ export default function Dashboard() {
         </div>
 
         {!isSubscribed && (
-          <Card className="bg-primary/5 border-primary/20 shadow-none">
+          <Card className="bg-primary/5 border-primary/20 shadow-none border-dashed">
             <CardContent className="flex flex-col md:flex-row items-center justify-between p-6 gap-6">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
@@ -208,13 +232,13 @@ export default function Dashboard() {
                   <p className="text-muted-foreground text-sm">Activate your membership to unlock score entry and monthly prize eligibility.</p>
                 </div>
               </div>
-              <Button onClick={handleSubscribe} className="bg-primary hover:bg-primary/90 px-8">Subscribe for $19/mo</Button>
+              <Button onClick={handleSubscribe} className="bg-primary hover:bg-primary/90 px-8 h-12 rounded-xl font-bold">Subscribe for $19/mo</Button>
             </CardContent>
           </Card>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="md:col-span-2 shadow-sm border-none bg-white relative overflow-hidden">
+          <Card className="md:col-span-2 shadow-sm border-none bg-white relative overflow-hidden rounded-[2rem]">
             {!isSubscribed && <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-10 flex items-center justify-center" />}
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -256,7 +280,7 @@ export default function Dashboard() {
           </Card>
 
           <div className="space-y-6">
-            <Card className={`shadow-sm border-none ${isSubscribed ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground opacity-70'}`}>
+            <Card className={`shadow-sm border-none rounded-[2rem] ${isSubscribed ? 'bg-primary text-primary-foreground shadow-primary/20 shadow-lg' : 'bg-secondary text-muted-foreground opacity-70'}`}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center justify-between">
                   Subscription
@@ -274,7 +298,7 @@ export default function Dashboard() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm border-none bg-white">
+            <Card className="shadow-sm border-none bg-white rounded-[2rem]">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center justify-between text-primary">
                   Total Winnings
@@ -290,7 +314,7 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="shadow-sm border-none bg-white">
+          <Card className="shadow-sm border-none bg-white rounded-[2rem]">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Heart className="h-5 w-5 text-destructive" />
@@ -299,58 +323,58 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
+                <div className="flex items-center justify-between p-4 rounded-2xl bg-secondary/30">
                   <div>
-                    <p className="text-sm font-semibold">{selectedCharity?.name || 'Search Foundations'}</p>
+                    <p className="text-sm font-bold">{selectedCharity?.name || 'Search Foundations'}</p>
                     <p className="text-xs text-muted-foreground line-clamp-1">10% of your fee is donated here.</p>
                   </div>
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href="/charities">Browse</Link>
+                  <Button variant="outline" size="sm" asChild className="rounded-xl">
+                    <Link href="/charities">Change</Link>
                   </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-none bg-white">
+          <Card className="shadow-sm border-none bg-white rounded-[2rem]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" />
-                Prize Claims
+              <CardTitle className="flex items-center gap-2 text-primary">
+                <Calendar className="h-5 w-5" />
+                Active Prize Claims
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {userWinnings?.filter(w => w.claimStatus !== 'verified').map((win) => (
-                  <div key={win.id} className="flex flex-col gap-3 p-3 border rounded-lg bg-background">
+                  <div key={win.id} className="flex flex-col gap-3 p-4 border border-secondary rounded-2xl bg-background/50">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="text-sm font-semibold">${win.prizeAmount} Won!</p>
+                        <p className="text-sm font-bold text-primary">${win.prizeAmount} Prize Won!</p>
                         <p className="text-[10px] text-muted-foreground">Match count: {win.matchCount}</p>
                       </div>
-                      <Badge variant={win.claimStatus === 'claimed' ? 'secondary' : 'outline'}>
+                      <Badge variant={win.claimStatus === 'claimed' ? 'secondary' : 'outline'} className="rounded-lg">
                         {win.claimStatus}
                       </Badge>
                     </div>
                     {win.claimStatus === 'pending' && (
                       <div className="flex gap-2">
                         <Input 
-                          placeholder="Upload proof URL" 
-                          className="h-8 text-xs" 
+                          placeholder="Link to score proof" 
+                          className="h-9 text-xs bg-white border-none rounded-xl" 
                           value={activeWinningId === win.id ? claimProof : ''}
                           onChange={(e) => {
                             setActiveWinningId(win.id);
                             setClaimProof(e.target.value);
                           }}
                         />
-                        <Button size="sm" className="h-8" onClick={() => handleClaimWinning(win.id)}>Claim</Button>
+                        <Button size="sm" className="h-9 rounded-xl px-4" onClick={() => handleClaimWinning(win.id)}>Submit</Button>
                       </div>
                     )}
                   </div>
                 ))}
                 {(!userWinnings || userWinnings.filter(w => w.claimStatus !== 'verified').length === 0) && (
-                  <div className="text-center py-8 text-muted-foreground italic text-sm">
-                    No active prizes to claim.
+                  <div className="text-center py-10 text-muted-foreground italic text-sm">
+                    No active prizes to claim yet. Keep playing!
                   </div>
                 )}
               </div>
