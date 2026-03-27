@@ -1,8 +1,9 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -11,34 +12,65 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trophy, Calendar, CreditCard, ChevronRight, History, Heart, Plus } from 'lucide-react';
-import { db } from '@/lib/mock-db';
+import { Trophy, Calendar, CreditCard, ChevronRight, History, Heart, Plus, LogOut } from 'lucide-react';
+import { useUser, useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { doc, serverTimestamp } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
+import { useAuth } from '@/firebase';
 
 export default function Dashboard() {
-  const [user, setUser] = useState(db.users['user-1']);
+  const { user, isUserLoading } = useUser();
+  const auth = useAuth();
+  const db = useFirestore();
+  const router = useRouter();
+
+  const userRef = useMemoFirebase(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userRef);
+
   const [newScore, setNewScore] = useState<string>('');
   const [isScoreDialogOpen, setIsScoreDialogOpen] = useState(false);
-  const [isCharityDialogOpen, setIsCharityDialogOpen] = useState(false);
 
-  const latestScores = user.scores;
-  const charity = db.charities.find(c => c.id === user.charityId);
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, router]);
 
   const handleLogScore = () => {
     const scoreVal = parseInt(newScore);
-    if (isNaN(scoreVal) || scoreVal < 0 || scoreVal > 60) return;
+    if (isNaN(scoreVal) || scoreVal < 1 || scoreVal > 45 || !userRef || !userProfile) return;
 
-    db.addScore(user.id, scoreVal);
-    setUser({ ...db.users[user.id] });
+    const currentScores = userProfile.last5Scores || [];
+    const updatedScores = [...currentScores, scoreVal];
+    if (updatedScores.length > 5) {
+      updatedScores.shift();
+    }
+
+    updateDocumentNonBlocking(userRef, {
+      last5Scores: updatedScores,
+      updatedAt: serverTimestamp(),
+    });
+
     setNewScore('');
     setIsScoreDialogOpen(false);
   };
 
-  const handleChangeCharity = (charityId: string) => {
-    const updatedUser = { ...user, charityId };
-    db.users[user.id] = updatedUser;
-    setUser(updatedUser);
-    setIsCharityDialogOpen(false);
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/');
   };
+
+  if (isUserLoading || isProfileLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse text-primary font-bold">Loading your fairway...</div>
+      </div>
+    );
+  }
+
+  if (!userProfile) return null;
+
+  const latestScores = userProfile.last5Scores || [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -49,23 +81,24 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-4">
           <Link href="/admin">
-            <Button variant="outline" size="sm">Admin Portal</Button>
+            <Button variant="outline" size="sm" className="hidden sm:flex">Admin Portal</Button>
           </Link>
-          <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-primary font-bold">AP</div>
+          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-destructive">
+            <LogOut className="h-4 w-4 mr-2" /> Logout
+          </Button>
+          <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-primary font-bold">
+            {userProfile.firstName?.[0]}{userProfile.lastName?.[0]}
+          </div>
         </div>
       </nav>
 
       <div className="max-w-7xl mx-auto p-6 lg:p-10 space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Welcome back, {user.name}</h1>
-            <p className="text-muted-foreground">You are currently entered in the March Draw.</p>
+            <h1 className="text-3xl font-bold">Welcome back, {userProfile.firstName}</h1>
+            <p className="text-muted-foreground">You are currently entered in the Monthly Draw.</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" className="hidden sm:flex">
-              <History className="mr-2 h-4 w-4" /> Participation History
-            </Button>
-            
             <Dialog open={isScoreDialogOpen} onOpenChange={setIsScoreDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-accent hover:bg-accent/90">
@@ -78,15 +111,17 @@ export default function Dashboard() {
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="score">Score Received</Label>
+                    <Label htmlFor="score">Score Received (1-45)</Label>
                     <Input 
                       id="score" 
                       type="number" 
+                      min="1"
+                      max="45"
                       placeholder="e.g. 36" 
                       value={newScore}
                       onChange={(e) => setNewScore(e.target.value)}
                     />
-                    <p className="text-xs text-muted-foreground">Stableford points from your latest round.</p>
+                    <p className="text-xs text-muted-foreground">Stableford points from your latest round. Newest replaces oldest (max 5).</p>
                   </div>
                 </div>
                 <DialogFooter>
@@ -111,17 +146,17 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="flex items-end gap-2 h-40">
-                {latestScores.map((score, i) => (
+                {latestScores.map((score: number, i: number) => (
                   <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
                     <div 
                       className="w-full bg-primary/10 rounded-t-md transition-all group-hover:bg-primary/20 relative" 
-                      style={{ height: `${(score / 50) * 100}%` }}
+                      style={{ height: `${(score / 45) * 100}%` }}
                     >
                       <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white text-xs px-2 py-1 rounded">
                         {score}
                       </div>
                     </div>
-                    <span className="text-xs text-muted-foreground font-medium">Round {i + 1}</span>
+                    <span className="text-xs text-muted-foreground font-medium">Rd {i + 1}</span>
                   </div>
                 ))}
                 {Array.from({ length: Math.max(0, 5 - latestScores.length) }).map((_, i) => (
@@ -154,14 +189,14 @@ export default function Dashboard() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm opacity-90">Current Plan</span>
-                  <span className="font-semibold capitalize">{user.plan}</span>
+                  <span className="font-semibold capitalize">Monthly Pro</span>
                 </div>
                 <div className="pt-2">
                   <div className="flex justify-between text-xs mb-1 opacity-80">
                     <span>Next Payment</span>
-                    <span>March 28, 2024</span>
+                    <span>March 31, 2024</span>
                   </div>
-                  <Progress value={65} className="h-1 bg-white/20" />
+                  <Progress value={80} className="h-1 bg-white/20" />
                 </div>
               </CardContent>
             </Card>
@@ -174,7 +209,7 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">${user.winnings}</div>
+                <div className="text-3xl font-bold">${userProfile.totalWinnings || 0}</div>
                 <p className="text-xs text-muted-foreground mt-1">Available for withdrawal</p>
                 <Button variant="ghost" size="sm" className="w-full mt-4 text-primary hover:text-primary/80">
                   Withdraw Funds <ChevronRight className="ml-1 h-4 w-4" />
@@ -196,37 +231,13 @@ export default function Dashboard() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
                   <div>
-                    <p className="text-sm font-semibold">{charity?.name}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-1">{charity?.mission}</p>
+                    <p className="text-sm font-semibold">Junior Golf Foundation</p>
+                    <p className="text-xs text-muted-foreground line-clamp-1">Empowering youth through sports and education.</p>
                   </div>
-                  <Dialog open={isCharityDialogOpen} onOpenChange={setIsCharityDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm">Change</Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Select Your Charity</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <Select onValueChange={handleChangeCharity} defaultValue={user.charityId || undefined}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Choose a charity" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {db.charities.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
-                                {c.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">10% of your entries go to this organization.</p>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  <Button variant="outline" size="sm">Change</Button>
                 </div>
                 <div className="text-center py-4">
-                  <span className="text-4xl font-bold text-primary">${(user.winnings * 0.1).toFixed(2)}</span>
+                  <span className="text-4xl font-bold text-primary">${((userProfile.totalWinnings || 0) * 0.1).toFixed(2)}</span>
                   <p className="text-sm text-muted-foreground">Total Generated for Charity</p>
                 </div>
               </div>

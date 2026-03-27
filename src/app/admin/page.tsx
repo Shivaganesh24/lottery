@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -6,28 +7,107 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCcw, Sparkles, Send, Users, Trophy, Heart } from 'lucide-react';
+import { RefreshCcw, Sparkles, Trophy, Users } from 'lucide-react';
 import { generatePrizeCharityDescription } from '@/ai/flows/admin-prize-charity-description-generator';
-import { db } from '@/lib/mock-db';
+import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc, query, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AdminPage() {
+  const db = useFirestore();
+  const { toast } = useToast();
+  
+  const usersQuery = useMemoFirebase(() => query(collection(db, 'users')), [db]);
+  const { data: users, isLoading: usersLoading } = useCollection(usersQuery);
+
+  const drawsQuery = useMemoFirebase(() => query(collection(db, 'draws')), [db]);
+  const { data: draws, isLoading: drawsLoading } = useCollection(drawsQuery);
+
   const [winningNumbers, setWinningNumbers] = useState<number[] | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isExecutingDraw, setIsExecutingDraw] = useState(false);
   const [aiOutput, setAiOutput] = useState<string>('');
   
-  // Prize generator form state
   const [prizeForm, setPrizeForm] = useState({
     name: '',
     value: '',
     features: ''
   });
 
-  const handleRunDraw = () => {
-    const result = db.runDraw();
-    setWinningNumbers(result);
+  const handleRunDraw = async () => {
+    if (!users || users.length === 0) return;
+    
+    setIsExecutingDraw(true);
+    const newWinningNumbers = Array.from({ length: 5 }, () => Math.floor(Math.random() * 45) + 1);
+    setWinningNumbers(newWinningNumbers);
+
+    try {
+      const batch = writeBatch(db);
+      const drawId = `draw-${Date.now()}`;
+      
+      // Record the draw
+      const drawRef = doc(db, 'draws', drawId);
+      batch.set(drawRef, {
+        id: drawId,
+        drawIdentifier: `Draw-${new Date().toISOString().split('T')[0]}`,
+        drawMonth: new Date().getMonth() + 1,
+        drawYear: new Date().getFullYear(),
+        drawDate: serverTimestamp(),
+        winningNumbers: newWinningNumbers,
+        status: 'completed',
+        prizeDescription: prizeForm.name || 'Monthly Prize Draw',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // Process winners (mock logic for MVP)
+      users.forEach(user => {
+        if (user.last5Scores && user.last5Scores.length === 5) {
+          const matches = user.last5Scores.filter((s: number) => newWinningNumbers.includes(s)).length;
+          let prize = 0;
+          if (matches === 3) prize = 50;
+          if (matches === 4) prize = 500;
+          if (matches === 5) prize = 5000;
+
+          if (prize > 0) {
+            const userRef = doc(db, 'users', user.id);
+            batch.update(userRef, {
+              totalWinnings: increment(prize),
+              updatedAt: serverTimestamp(),
+            });
+
+            const winningRef = doc(collection(db, `users/${user.id}/winnings`));
+            batch.set(winningRef, {
+              id: winningRef.id,
+              userId: user.id,
+              drawId: drawId,
+              prizeId: 'monthly-prize',
+              matchCount: matches,
+              winningScores: user.last5Scores.filter((s: number) => newWinningNumbers.includes(s)),
+              claimStatus: 'pending',
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+          }
+        }
+      });
+
+      await batch.commit();
+      toast({
+        title: 'Draw Completed!',
+        description: `Winning numbers: ${newWinningNumbers.join(', ')}`,
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Draw Failed',
+        description: error.message,
+      });
+    } finally {
+      setIsExecutingDraw(false);
+    }
   };
 
   const handleGenerateAiDescription = async () => {
@@ -56,10 +136,7 @@ export default function AdminPage() {
             <h1 className="text-3xl font-bold">Admin Control Center</h1>
             <p className="text-muted-foreground">Manage FairwayFortune draws and platform content.</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => window.location.href = '/dashboard'}>Return to Dashboard</Button>
-            <Button className="bg-primary hover:bg-primary/90">System Health</Button>
-          </div>
+          <Button variant="outline" onClick={() => window.location.href = '/dashboard'}>Return to Dashboard</Button>
         </header>
 
         <Tabs defaultValue="draws" className="space-y-6">
@@ -74,7 +151,7 @@ export default function AdminPage() {
               <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle>Run Monthly Draw</CardTitle>
-                  <CardDescription>Generate new winning numbers and calculate prize matches.</CardDescription>
+                  <CardDescription>Generate new winning numbers and update winnings.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex justify-center gap-3">
@@ -92,73 +169,44 @@ export default function AdminPage() {
                       ))
                     )}
                   </div>
-                  <Button className="w-full bg-accent hover:bg-accent/90" onClick={handleRunDraw}>
-                    <RefreshCcw className="mr-2 h-4 w-4" /> Execute Draw
+                  <Button 
+                    className="w-full bg-accent hover:bg-accent/90" 
+                    onClick={handleRunDraw}
+                    disabled={isExecutingDraw || usersLoading}
+                  >
+                    <RefreshCcw className={`mr-2 h-4 w-4 ${isExecutingDraw ? 'animate-spin' : ''}`} /> 
+                    {isExecutingDraw ? 'Processing...' : 'Execute Draw'}
                   </Button>
                 </CardContent>
               </Card>
 
               <Card className="shadow-sm">
                 <CardHeader>
-                  <CardTitle>Winner Statistics</CardTitle>
-                  <CardDescription>Recent payout data and match frequency.</CardDescription>
+                  <CardTitle>Recent Draws</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center py-2 border-b">
-                      <span className="text-sm">Total Winners</span>
-                      <span className="font-bold">{db.winners.length}</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2 border-b">
-                      <span className="text-sm">Total Payouts</span>
-                      <span className="font-bold text-primary">${db.winners.reduce((acc, w) => acc + w.prize, 0)}</span>
-                    </div>
-                    <div className="flex justify-between items-center py-2">
-                      <span className="text-sm">Active Subscriptions</span>
-                      <span className="font-bold">1</span>
-                    </div>
+                    {draws?.slice(0, 3).map((draw) => (
+                      <div key={draw.id} className="flex justify-between items-center py-2 border-b last:border-0">
+                        <span className="text-sm font-medium">{draw.drawIdentifier}</span>
+                        <div className="flex gap-1">
+                          {draw.winningNumbers.map((n: number, i: number) => (
+                            <Badge key={i} variant="outline" className="text-[10px] px-1">{n}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {(!draws || draws.length === 0) && <p className="text-sm text-muted-foreground italic">No draws recorded yet.</p>}
                   </div>
                 </CardContent>
               </Card>
             </div>
-
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle>Recent Winners</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>User ID</TableHead>
-                      <TableHead>Matches</TableHead>
-                      <TableHead>Prize</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {db.winners.length > 0 ? db.winners.map((winner, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="font-medium">{winner.userId}</TableCell>
-                        <TableCell>{winner.matches} Matches</TableCell>
-                        <TableCell className="text-accent font-bold">${winner.prize}</TableCell>
-                        <TableCell><Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">Verified</Badge></TableCell>
-                      </TableRow>
-                    )) : (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">No recent winners found.</TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="users">
             <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle>Manage Platform Users</CardTitle>
+                <CardTitle>Platform Users</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -166,23 +214,24 @@ export default function AdminPage() {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead>Subscription</TableHead>
-                      <TableHead>Action</TableHead>
+                      <TableHead>Latest Scores</TableHead>
+                      <TableHead>Winnings</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {Object.values(db.users).map((user) => (
+                    {users?.map((user) => (
                       <TableRow key={user.id}>
-                        <TableCell className="font-bold">{user.name}</TableCell>
+                        <TableCell className="font-bold">{user.firstName} {user.lastName}</TableCell>
                         <TableCell>{user.email}</TableCell>
                         <TableCell>
-                          <Badge variant={user.isSubscribed ? "default" : "secondary"}>
-                            {user.isSubscribed ? user.plan : 'None'}
-                          </Badge>
+                          <div className="flex gap-1">
+                            {user.last5Scores?.map((s: number, i: number) => (
+                              <Badge key={i} variant="secondary" className="text-[10px]">{s}</Badge>
+                            ))}
+                            {(!user.last5Scores || user.last5Scores.length === 0) && <span className="text-xs text-muted-foreground">No scores</span>}
+                          </div>
                         </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm">Edit</Button>
-                        </TableCell>
+                        <TableCell className="text-primary font-bold">${user.totalWinnings || 0}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
