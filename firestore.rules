@@ -15,21 +15,6 @@ rules_version = '2';
  * - /users/{userId}/winnings: User-specific prize draw results and claims.
  * - /subscriptionPlans, /charities, /draws, /prizes: Publicly readable global configuration and event data.
  * - /admin_users: A restricted collection where the existence of a document grants administrative rights.
- * 
- * KEY SECURITY DECISIONS:
- * 1. DBAC (Existence over Content): Admin status is determined by the existence of a document in 
- *    the /admin_users/ collection, rather than a 'role' field within a user document.
- * 2. Ownership Validation: Every user-scoped document contains a denormalized 'userId' or 'id' 
- *    field that must match both the document path and the authenticated user's UID.
- * 3. Public Readability: Global collections related to the golf platform's offerings (Plans, 
- *    Charities, Prizes) are open for public consumption to allow for anonymous browsing.
- * 4. Immutability: Critical relational links, such as the ownership of a subscription, 
- *    are enforced as immutable during updates.
- * 
- * DENORMALIZATION FOR AUTHORIZATION:
- * To optimize performance and ensure atomic security checks, the 'userId' is duplicated 
- * within subcollection documents. This allows rules to verify ownership without 
- * fetching parent documents.
  */
 
 service cloud.firestore {
@@ -60,11 +45,7 @@ service cloud.firestore {
     // --- COLLECTION RULES ---
 
     /**
-     * @description Rules for user profile documents. Users can manage their own profile; admins have full access.
-     * @path /users/{userId}
-     * @allow (create) auth.uid matches path and internal 'id' field matches path.
-     * @deny (update) user attempts to change another user's profile.
-     * @principle Ownership validation and self-creation.
+     * @description Rules for user profile documents.
      */
     match /users/{userId} {
       allow get, list: if isOwner(userId) || isAdmin();
@@ -74,12 +55,7 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rules for the admin registry. Existence of a UID here defines administrative status.
-     * @path /admin_users/{userId}
-     * @allow (get) any signed-in user to check if they/others are admins.
-     * @allow (create) users to promote themselves for prototype/MVP testing purposes.
-     * @deny (write) any non-owner client-side attempt to modify the admin list.
-     * @principle DBAC (Existence over Content).
+     * @description Rules for the admin registry.
      */
     match /admin_users/{userId} {
       allow get: if isSignedIn();
@@ -89,11 +65,7 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rules for subscription plans, charities, and prizes. Publicly readable, admin editable.
-     * @path /subscriptionPlans/{id}, /charities/{id}, /prizes/{id}
-     * @allow (list) anonymous users to browse available plans or charities.
-     * @deny (create) non-admin users attempting to create a new plan.
-     * @principle Public Read with Owner-Only (Admin) Writes.
+     * @description Rules for global public collections.
      */
     match /subscriptionPlans/{id} {
       allow get, list: if true;
@@ -110,24 +82,13 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
-    /**
-     * @description Rules for draw events. Publicly readable records of monthly draws.
-     * @path /draws/{drawId}
-     * @allow (get) public access to view winning numbers and draw details.
-     * @deny (update) any non-admin modification of draw results.
-     * @principle Public Read with Owner-Only (Admin) Writes.
-     */
-    match /draws/{drawId} {
+    match /draws/{id} {
       allow get, list: if true;
       allow create, update, delete: if isAdmin();
     }
 
     /**
      * @description Rules for user-specific subscriptions.
-     * @path /users/{userId}/subscriptions/{subscriptionId}
-     * @allow (create) owner creating a record where the internal 'userId' matches the path.
-     * @deny (update) user attempting to transfer a subscription to a different UID.
-     * @principle Authorization Independence and relational integrity.
      */
     match /users/{userId}/subscriptions/{subscriptionId} {
       allow get, list: if isOwner(userId) || isAdmin();
@@ -137,17 +98,19 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rules for winning records. Admins create/verify; users read and claim.
-     * @path /users/{userId}/winnings/{winningId}
-     * @allow (update) owner updating the 'claimStatus' of their own winning record.
-     * @deny (create) user attempting to create their own winning record.
-     * @principle Ownership for claim management, Admin-only creation.
+     * @description Rules for winning records. 
+     * Includes collectionGroup support to allow admins to fetch all winnings across all users.
      */
     match /users/{userId}/winnings/{winningId} {
       allow get, list: if isOwner(userId) || isAdmin();
       allow create: if isAdmin();
       allow update: if (isExistingOwner(userId) || isAdmin()) && request.resource.data.userId == resource.data.userId;
       allow delete: if isAdmin();
+    }
+
+    // COLLECTION GROUP: Allow admins to list and get winnings from any path
+    match /{path=**}/winnings/{winningId} {
+      allow list, get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
     }
 
   }
