@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -11,8 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trophy, Calendar, CreditCard, ChevronRight, History, Heart, Plus, LogOut } from 'lucide-react';
+import { Trophy, Calendar, CreditCard, ChevronRight, Heart, Plus, LogOut, ShieldCheck } from 'lucide-react';
 import { useUser, useFirestore, useDoc, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { doc, serverTimestamp } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
@@ -26,6 +24,11 @@ export default function Dashboard() {
 
   const userRef = useMemoFirebase(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userRef);
+
+  // Check if the current user is an admin
+  const adminDocRef = useMemoFirebase(() => (user ? doc(db, 'admin_users', user.uid) : null), [db, user]);
+  const { data: adminProfile } = useDoc(adminDocRef);
+  const isAdmin = !!adminProfile;
 
   const [newScore, setNewScore] = useState<string>('');
   const [isScoreDialogOpen, setIsScoreDialogOpen] = useState(false);
@@ -80,9 +83,13 @@ export default function Dashboard() {
           <span className="text-xl font-bold tracking-tight text-primary">FairwayFortune</span>
         </div>
         <div className="flex items-center gap-4">
-          <Link href="/admin">
-            <Button variant="outline" size="sm" className="hidden sm:flex">Admin Portal</Button>
-          </Link>
+          {isAdmin && (
+            <Link href="/admin">
+              <Button variant="outline" size="sm" className="hidden sm:flex border-accent text-accent hover:bg-accent/10">
+                <ShieldCheck className="mr-2 h-4 w-4" /> Admin Portal
+              </Button>
+            </Link>
+          )}
           <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-destructive">
             <LogOut className="h-4 w-4 mr-2" /> Logout
           </Button>

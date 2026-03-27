@@ -1,7 +1,6 @@
-
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,20 +8,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCcw, Sparkles, Trophy, Users } from 'lucide-react';
+import { RefreshCcw, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
 import { generatePrizeCharityDescription } from '@/ai/flows/admin-prize-charity-description-generator';
-import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { useFirestore, useCollection, useDoc, useUser, useMemoFirebase } from '@/firebase';
 import { collection, doc, query, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 export default function AdminPage() {
   const db = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   
-  const usersQuery = useMemoFirebase(() => query(collection(db, 'users')), [db]);
+  // Verify if the current user is an admin
+  const adminDocRef = useMemoFirebase(() => (user ? doc(db, 'admin_users', user.uid) : null), [db, user]);
+  const { data: adminProfile, isLoading: isAdminChecking } = useDoc(adminDocRef);
+  const isAdmin = !!adminProfile;
+
+  // Only run sensitive queries if the user is confirmed as an admin
+  const usersQuery = useMemoFirebase(() => (isAdmin ? query(collection(db, 'users')) : null), [db, isAdmin]);
   const { data: users, isLoading: usersLoading } = useCollection(usersQuery);
 
-  const drawsQuery = useMemoFirebase(() => query(collection(db, 'draws')), [db]);
+  const drawsQuery = useMemoFirebase(() => (isAdmin ? query(collection(db, 'draws')) : null), [db, isAdmin]);
   const { data: draws, isLoading: drawsLoading } = useCollection(drawsQuery);
 
   const [winningNumbers, setWinningNumbers] = useState<number[] | null>(null);
@@ -47,7 +54,6 @@ export default function AdminPage() {
       const batch = writeBatch(db);
       const drawId = `draw-${Date.now()}`;
       
-      // Record the draw
       const drawRef = doc(db, 'draws', drawId);
       batch.set(drawRef, {
         id: drawId,
@@ -62,7 +68,6 @@ export default function AdminPage() {
         updatedAt: serverTimestamp(),
       });
 
-      // Process winners (mock logic for MVP)
       users.forEach(user => {
         if (user.last5Scores && user.last5Scores.length === 5) {
           const matches = user.last5Scores.filter((s: number) => newWinningNumbers.includes(s)).length;
@@ -128,6 +133,36 @@ export default function AdminPage() {
     }
   };
 
+  if (isAdminChecking) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground animate-pulse">Verifying credentials...</p>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-6">
+        <Card className="max-w-md w-full shadow-lg border-destructive/20">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+              <AlertCircle className="h-6 w-6 text-destructive" />
+            </div>
+            <CardTitle>Access Denied</CardTitle>
+            <CardDescription>You do not have administrative privileges to access this area.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            <Link href="/dashboard">
+              <Button variant="outline">Back to Dashboard</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-6 md:p-10">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -136,7 +171,9 @@ export default function AdminPage() {
             <h1 className="text-3xl font-bold">Admin Control Center</h1>
             <p className="text-muted-foreground">Manage FairwayFortune draws and platform content.</p>
           </div>
-          <Button variant="outline" onClick={() => window.location.href = '/dashboard'}>Return to Dashboard</Button>
+          <Link href="/dashboard">
+            <Button variant="outline">Return to Dashboard</Button>
+          </Link>
         </header>
 
         <Tabs defaultValue="draws" className="space-y-6">
@@ -186,7 +223,9 @@ export default function AdminPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {draws?.slice(0, 3).map((draw) => (
+                    {drawsLoading ? (
+                      <div className="flex justify-center py-4"><Loader2 className="animate-spin" /></div>
+                    ) : draws?.slice(0, 3).map((draw) => (
                       <div key={draw.id} className="flex justify-between items-center py-2 border-b last:border-0">
                         <span className="text-sm font-medium">{draw.drawIdentifier}</span>
                         <div className="flex gap-1">
@@ -196,7 +235,7 @@ export default function AdminPage() {
                         </div>
                       </div>
                     ))}
-                    {(!draws || draws.length === 0) && <p className="text-sm text-muted-foreground italic">No draws recorded yet.</p>}
+                    {(!draws || draws.length === 0) && !drawsLoading && <p className="text-sm text-muted-foreground italic">No draws recorded yet.</p>}
                   </div>
                 </CardContent>
               </Card>
@@ -219,7 +258,9 @@ export default function AdminPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users?.map((user) => (
+                    {usersLoading ? (
+                      <TableRow><TableCell colSpan={4} className="text-center py-8"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
+                    ) : users?.map((user) => (
                       <TableRow key={user.id}>
                         <TableCell className="font-bold">{user.firstName} {user.lastName}</TableCell>
                         <TableCell>{user.email}</TableCell>
