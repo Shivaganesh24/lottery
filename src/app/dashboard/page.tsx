@@ -1,20 +1,47 @@
+
+'use client';
+
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trophy, Calendar, CreditCard, ChevronRight, History, Heart, Plus } from 'lucide-react';
 import { db } from '@/lib/mock-db';
 
 export default function Dashboard() {
-  const user = db.users['user-1']; // Simulation: getting current logged in user
+  const [user, setUser] = useState(db.users['user-1']);
+  const [newScore, setNewScore] = useState<string>('');
+  const [isScoreDialogOpen, setIsScoreDialogOpen] = useState(false);
+  const [isCharityDialogOpen, setIsCharityDialogOpen] = useState(false);
+
   const latestScores = user.scores;
   const charity = db.charities.find(c => c.id === user.charityId);
 
+  const handleLogScore = () => {
+    const scoreVal = parseInt(newScore);
+    if (isNaN(scoreVal) || scoreVal < 0 || scoreVal > 60) return;
+
+    db.addScore(user.id, scoreVal);
+    setUser({ ...db.users[user.id] });
+    setNewScore('');
+    setIsScoreDialogOpen(false);
+  };
+
+  const handleChangeCharity = (charityId: string) => {
+    const updatedUser = { ...user, charityId };
+    db.users[user.id] = updatedUser;
+    setUser(updatedUser);
+    setIsCharityDialogOpen(false);
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Sidebar-like Navigation Header */}
       <nav className="bg-white border-b px-6 h-16 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white font-bold">FF</div>
@@ -38,14 +65,40 @@ export default function Dashboard() {
             <Button variant="outline" className="hidden sm:flex">
               <History className="mr-2 h-4 w-4" /> Participation History
             </Button>
-            <Button className="bg-accent hover:bg-accent/90">
-              <Plus className="mr-2 h-4 w-4" /> Log New Score
-            </Button>
+            
+            <Dialog open={isScoreDialogOpen} onOpenChange={setIsScoreDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-accent hover:bg-accent/90">
+                  <Plus className="mr-2 h-4 w-4" /> Log New Score
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Log Stableford Score</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="score">Score Received</Label>
+                    <Input 
+                      id="score" 
+                      type="number" 
+                      placeholder="e.g. 36" 
+                      value={newScore}
+                      onChange={(e) => setNewScore(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">Stableford points from your latest round.</p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsScoreDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handleLogScore}>Submit Score</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Main Score Card */}
           <Card className="md:col-span-2 shadow-sm border-none bg-white">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -62,13 +115,19 @@ export default function Dashboard() {
                   <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
                     <div 
                       className="w-full bg-primary/10 rounded-t-md transition-all group-hover:bg-primary/20 relative" 
-                      style={{ height: `${(score / 45) * 100}%` }}
+                      style={{ height: `${(score / 50) * 100}%` }}
                     >
                       <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white text-xs px-2 py-1 rounded">
                         {score}
                       </div>
                     </div>
                     <span className="text-xs text-muted-foreground font-medium">Round {i + 1}</span>
+                  </div>
+                ))}
+                {Array.from({ length: Math.max(0, 5 - latestScores.length) }).map((_, i) => (
+                  <div key={`empty-${i}`} className="flex-1 flex flex-col items-center gap-2">
+                    <div className="w-full bg-secondary/30 h-8 rounded-t-md border-2 border-dashed border-muted" />
+                    <span className="text-xs text-muted-foreground font-medium italic">Pending</span>
                   </div>
                 ))}
               </div>
@@ -80,7 +139,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Subscription & Prize Status */}
           <div className="space-y-6">
             <Card className="shadow-sm border-none bg-primary text-primary-foreground">
               <CardHeader className="pb-2">
@@ -141,7 +199,31 @@ export default function Dashboard() {
                     <p className="text-sm font-semibold">{charity?.name}</p>
                     <p className="text-xs text-muted-foreground line-clamp-1">{charity?.mission}</p>
                   </div>
-                  <Button variant="outline" size="sm">Change</Button>
+                  <Dialog open={isCharityDialogOpen} onOpenChange={setIsCharityDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">Change</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Select Your Charity</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <Select onValueChange={handleChangeCharity} defaultValue={user.charityId || undefined}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choose a charity" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {db.charities.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">10% of your entries go to this organization.</p>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
                 <div className="text-center py-4">
                   <span className="text-4xl font-bold text-primary">${(user.winnings * 0.1).toFixed(2)}</span>

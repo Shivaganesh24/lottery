@@ -1,3 +1,22 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "golf-course-hero",
+      "description": "A beautiful lush green golf course at sunset.",
+      "imageUrl": "https://picsum.photos/seed/golf1/1200/600",
+      "imageHint": "golf course"
+    },
+    {
+      "id": "golf-prize-driver",
+      "description": "A modern high-end golf driver.",
+      "imageUrl": "https://picsum.photos/seed/golf2/600/400",
+      "imageHint": "golf club"
+    },
+    {
+      "id": "charity-youth-golf",
+      "description": "Children learning to play golf.",
+      "imageUrl": "https://picsum.photos/seed/golf3/600/400",
+      "imageHint": "children golf"
+    }
+  ]
 }
