@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCcw, Sparkles, AlertCircle, Loader2, UserPlus } from 'lucide-react';
+import { RefreshCcw, Sparkles, AlertCircle, Loader2, UserPlus, CheckCircle, XCircle, Trophy } from 'lucide-react';
 import { generatePrizeCharityDescription } from '@/ai/flows/admin-prize-charity-description-generator';
-import { useFirestore, useCollection, useDoc, useUser, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, writeBatch, increment, serverTimestamp, setDoc } from 'firebase/firestore';
+import { useFirestore, useCollection, useDoc, useUser, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { collection, doc, query, writeBatch, increment, serverTimestamp, setDoc, collectionGroup } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
@@ -25,22 +25,23 @@ export default function AdminPage() {
     setMounted(true);
   }, []);
   
-  // Verify if the current user is an admin
   const adminDocRef = useMemoFirebase(() => (user ? doc(db, 'admin_users', user.uid) : null), [db, user]);
   const { data: adminProfile, isLoading: isAdminChecking } = useDoc(adminDocRef);
   const isAdmin = !!adminProfile;
 
-  // Only run sensitive queries if the user is confirmed as an admin
   const usersQuery = useMemoFirebase(() => (isAdmin ? query(collection(db, 'users')) : null), [db, isAdmin]);
   const { data: users, isLoading: usersLoading } = useCollection(usersQuery);
 
   const drawsQuery = useMemoFirebase(() => (isAdmin ? query(collection(db, 'draws')) : null), [db, isAdmin]);
   const { data: draws, isLoading: drawsLoading } = useCollection(drawsQuery);
 
+  const winningsQuery = useMemoFirebase(() => (isAdmin ? query(collectionGroup(db, 'winnings')) : null), [db, isAdmin]);
+  const { data: allWinnings, isLoading: winningsLoading } = useCollection(winningsQuery);
+
   const [winningNumbers, setWinningNumbers] = useState<number[] | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isExecutingDraw, setIsExecutingDraw] = useState(false);
   const [isPromoting, setIsPromoting] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [aiOutput, setAiOutput] = useState<string>('');
   
   const [prizeForm, setPrizeForm] = useState({
@@ -74,29 +75,32 @@ export default function AdminPage() {
         updatedAt: serverTimestamp(),
       });
 
-      users.forEach(user => {
-        if (user.last5Scores && user.last5Scores.length === 5) {
-          const matches = user.last5Scores.filter((s: number) => newWinningNumbers.includes(s)).length;
+      users.forEach(u => {
+        if (u.status === 'active' && u.last5Scores && u.last5Scores.length === 5) {
+          const matchedScores = u.last5Scores.filter((s: number) => newWinningNumbers.includes(s));
+          const matches = matchedScores.length;
+          
           let prize = 0;
           if (matches === 3) prize = 50;
           if (matches === 4) prize = 500;
           if (matches === 5) prize = 5000;
 
           if (prize > 0) {
-            const userRef = doc(db, 'users', user.id);
+            const userRef = doc(db, 'users', u.id);
             batch.update(userRef, {
               totalWinnings: increment(prize),
               updatedAt: serverTimestamp(),
             });
 
-            const winningRef = doc(collection(db, `users/${user.id}/winnings`));
+            const winningRef = doc(collection(db, `users/${u.id}/winnings`));
             batch.set(winningRef, {
               id: winningRef.id,
-              userId: user.id,
+              userId: u.id,
+              userName: `${u.firstName} ${u.lastName}`,
               drawId: drawId,
               prizeId: 'monthly-prize',
               matchCount: matches,
-              winningScores: user.last5Scores.filter((s: number) => newWinningNumbers.includes(s)),
+              winningScores: matchedScores,
               claimStatus: 'pending',
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
@@ -119,6 +123,16 @@ export default function AdminPage() {
     } finally {
       setIsExecutingDraw(false);
     }
+  };
+
+  const handleVerifyWinning = (win: any, approved: boolean) => {
+    const winningRef = doc(db, `users/${win.userId}/winnings`, win.id);
+    updateDocumentNonBlocking(winningRef, {
+      claimStatus: approved ? 'verified' : 'rejected',
+      verificationDate: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    toast({ title: approved ? 'Winner Verified' : 'Winner Rejected' });
   };
 
   const handleGenerateAiDescription = async () => {
@@ -148,16 +162,9 @@ export default function AdminPage() {
         email: user.email,
         promotedAt: serverTimestamp(),
       });
-      toast({
-        title: 'Admin Access Granted',
-        description: 'You are now an administrator for FairwayFortune.',
-      });
+      toast({ title: 'Admin Access Granted' });
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Promotion Failed',
-        description: error.message,
-      });
+      toast({ variant: 'destructive', title: 'Promotion Failed', description: error.message });
     } finally {
       setIsPromoting(false);
     }
@@ -184,11 +191,7 @@ export default function AdminPage() {
             <CardDescription>You do not have administrative privileges to access this area.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 justify-center">
-            <Button 
-              className="w-full bg-primary" 
-              onClick={handlePromoteToAdmin}
-              disabled={isPromoting}
-            >
+            <Button className="w-full bg-primary" onClick={handlePromoteToAdmin} disabled={isPromoting}>
               {isPromoting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <UserPlus className="mr-2 h-4 w-4" />}
               Promote Myself to Admin (Dev Only)
             </Button>
@@ -215,10 +218,11 @@ export default function AdminPage() {
         </header>
 
         <Tabs defaultValue="draws" className="space-y-6">
-          <TabsList className="bg-white border p-1 h-auto grid grid-cols-3 w-full max-w-md">
-            <TabsTrigger value="draws" className="py-2">Draw Management</TabsTrigger>
-            <TabsTrigger value="users" className="py-2">User Directory</TabsTrigger>
-            <TabsTrigger value="ai-tools" className="py-2">Content AI</TabsTrigger>
+          <TabsList className="bg-white border p-1 h-auto grid grid-cols-4 w-full max-w-lg">
+            <TabsTrigger value="draws" className="py-2">Draws</TabsTrigger>
+            <TabsTrigger value="winners" className="py-2">Winners</TabsTrigger>
+            <TabsTrigger value="users" className="py-2">Users</TabsTrigger>
+            <TabsTrigger value="ai-tools" className="py-2">AI Tools</TabsTrigger>
           </TabsList>
 
           <TabsContent value="draws" className="space-y-6">
@@ -244,11 +248,7 @@ export default function AdminPage() {
                       ))
                     )}
                   </div>
-                  <Button 
-                    className="w-full bg-accent hover:bg-accent/90" 
-                    onClick={handleRunDraw}
-                    disabled={isExecutingDraw || usersLoading}
-                  >
+                  <Button className="w-full bg-accent hover:bg-accent/90" onClick={handleRunDraw} disabled={isExecutingDraw || usersLoading}>
                     <RefreshCcw className={`mr-2 h-4 w-4 ${isExecutingDraw ? 'animate-spin' : ''}`} /> 
                     {isExecutingDraw ? 'Processing...' : 'Execute Draw'}
                   </Button>
@@ -263,7 +263,7 @@ export default function AdminPage() {
                   <div className="space-y-4">
                     {drawsLoading ? (
                       <div className="flex justify-center py-4"><Loader2 className="animate-spin" /></div>
-                    ) : draws?.slice(0, 3).map((draw) => (
+                    ) : draws?.slice(0, 5).map((draw) => (
                       <div key={draw.id} className="flex justify-between items-center py-2 border-b last:border-0">
                         <span className="text-sm font-medium">{draw.drawIdentifier}</span>
                         <div className="flex gap-1">
@@ -273,24 +273,68 @@ export default function AdminPage() {
                         </div>
                       </div>
                     ))}
-                    {(!draws || draws.length === 0) && !drawsLoading && <p className="text-sm text-muted-foreground italic">No draws recorded yet.</p>}
                   </div>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
+          <TabsContent value="winners">
+            <Card>
+              <CardHeader>
+                <CardTitle>Prize Verification</CardTitle>
+                <CardDescription>Approve or reject pending prize claims based on user proof.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Match</TableHead>
+                      <TableHead>Proof</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {winningsLoading ? (
+                      <TableRow><TableCell colSpan={5} className="text-center"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
+                    ) : allWinnings?.filter(w => w.claimStatus !== 'verified' && w.claimStatus !== 'rejected').map((win) => (
+                      <TableRow key={win.id}>
+                        <TableCell className="font-medium">{win.userName || 'Unknown User'}</TableCell>
+                        <TableCell><Badge variant="outline">{win.matchCount} Matches</Badge></TableCell>
+                        <TableCell className="text-xs truncate max-w-[150px] text-primary underline">{win.proofUrl || 'No proof yet'}</TableCell>
+                        <TableCell><Badge>{win.claimStatus}</Badge></TableCell>
+                        <TableCell className="text-right flex justify-end gap-2">
+                          <Button size="sm" variant="outline" onClick={() => handleVerifyWinning(win, true)} disabled={win.claimStatus === 'pending'}>
+                            <CheckCircle className="h-4 w-4 text-accent" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => handleVerifyWinning(win, false)} disabled={win.claimStatus === 'pending'}>
+                            <XCircle className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {allWinnings?.filter(w => w.claimStatus !== 'verified' && w.claimStatus !== 'rejected').length === 0 && (
+                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No pending claims found.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="users">
             <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle>Platform Users</CardTitle>
+                <CardTitle>Platform Directory</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
+                      <TableHead>Subscription</TableHead>
                       <TableHead>Latest Scores</TableHead>
                       <TableHead>Winnings</TableHead>
                     </TableRow>
@@ -298,19 +342,20 @@ export default function AdminPage() {
                   <TableBody>
                     {usersLoading ? (
                       <TableRow><TableCell colSpan={4} className="text-center py-8"><Loader2 className="animate-spin mx-auto" /></TableCell></TableRow>
-                    ) : users?.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-bold">{user.firstName} {user.lastName}</TableCell>
-                        <TableCell>{user.email}</TableCell>
+                    ) : users?.map((u) => (
+                      <TableRow key={u.id}>
+                        <TableCell className="font-bold">{u.firstName} {u.lastName}</TableCell>
+                        <TableCell>
+                          <Badge variant={u.status === 'active' ? 'default' : 'secondary'}>{u.status || 'inactive'}</Badge>
+                        </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            {user.last5Scores?.map((s: number, i: number) => (
-                              <Badge key={i} variant="secondary" className="text-[10px]">{s}</Badge>
+                            {u.last5Scores?.map((s: number, i: number) => (
+                              <Badge key={i} variant="outline" className="text-[10px]">{s}</Badge>
                             ))}
-                            {(!user.last5Scores || user.last5Scores.length === 0) && <span className="text-xs text-muted-foreground">No scores</span>}
                           </div>
                         </TableCell>
-                        <TableCell className="text-primary font-bold">${user.totalWinnings || 0}</TableCell>
+                        <TableCell className="text-primary font-bold">${u.totalWinnings || 0}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -332,36 +377,17 @@ export default function AdminPage() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="prize-name">Prize Name</Label>
-                    <Input 
-                      id="prize-name" 
-                      placeholder="e.g. Taylormade Stealth 2 Driver" 
-                      value={prizeForm.name}
-                      onChange={(e) => setPrizeForm({...prizeForm, name: e.target.value})}
-                    />
+                    <Input id="prize-name" placeholder="e.g. Taylormade Stealth 2 Driver" value={prizeForm.name} onChange={(e) => setPrizeForm({...prizeForm, name: e.target.value})} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="prize-value">Estimated Value</Label>
-                    <Input 
-                      id="prize-value" 
-                      placeholder="e.g. $599" 
-                      value={prizeForm.value}
-                      onChange={(e) => setPrizeForm({...prizeForm, value: e.target.value})}
-                    />
+                    <Input id="prize-value" placeholder="e.g. $599" value={prizeForm.value} onChange={(e) => setPrizeForm({...prizeForm, value: e.target.value})} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="prize-features">Key Features (comma separated)</Label>
-                    <Input 
-                      id="prize-features" 
-                      placeholder="Carbon face, high MOI, fast ball speed" 
-                      value={prizeForm.features}
-                      onChange={(e) => setPrizeForm({...prizeForm, features: e.target.value})}
-                    />
+                    <Input id="prize-features" placeholder="Carbon face, high MOI, fast ball speed" value={prizeForm.features} onChange={(e) => setPrizeForm({...prizeForm, features: e.target.value})} />
                   </div>
-                  <Button 
-                    className="w-full bg-primary" 
-                    onClick={handleGenerateAiDescription}
-                    disabled={isGenerating}
-                  >
+                  <Button className="w-full bg-primary" onClick={handleGenerateAiDescription} disabled={isGenerating}>
                     {isGenerating ? 'Generating...' : 'Generate Description'}
                   </Button>
                 </CardContent>
@@ -374,9 +400,7 @@ export default function AdminPage() {
                 <CardContent>
                   {aiOutput ? (
                     <div className="space-y-4">
-                      <div className="p-4 rounded-lg bg-secondary/30 text-sm leading-relaxed whitespace-pre-wrap">
-                        {aiOutput}
-                      </div>
+                      <div className="p-4 rounded-lg bg-secondary/30 text-sm leading-relaxed whitespace-pre-wrap">{aiOutput}</div>
                       <Button variant="outline" className="w-full" onClick={() => setAiOutput('')}>Clear</Button>
                     </div>
                   ) : (
