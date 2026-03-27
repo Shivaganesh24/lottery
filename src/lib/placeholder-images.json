@@ -17,6 +17,18 @@
       "description": "Children learning to play golf.",
       "imageUrl": "https://picsum.photos/seed/golf3/600/400",
       "imageHint": "children golf"
+    },
+    {
+      "id": "login-visual",
+      "description": "A close up of a golf ball on a tee with a dramatic sunrise background.",
+      "imageUrl": "https://picsum.photos/seed/golf-login/800/1200",
+      "imageHint": "golf sunrise"
+    },
+    {
+      "id": "signup-visual",
+      "description": "A golfer following through on a powerful swing under a clear blue sky.",
+      "imageUrl": "https://picsum.photos/seed/golf-signup/800/1200",
+      "imageHint": "golf swing"
     }
   ]
 }

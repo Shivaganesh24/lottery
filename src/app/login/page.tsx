@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth, useUser } from '@/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -22,6 +25,8 @@ export default function LoginPage() {
   const { user } = useUser();
   const router = useRouter();
   const { toast } = useToast();
+
+  const loginImage = PlaceHolderImages.find(img => img.id === 'login-visual');
 
   useEffect(() => {
     setMounted(true);
@@ -51,42 +56,54 @@ export default function LoginPage() {
   };
 
   if (!mounted) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen flex bg-black">
-      {/* Visual Side with Video Background */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover opacity-80"
-        >
-          <source src="https://assets.mixkit.co/videos/preview/mixkit-young-man-hitting-a-golf-ball-on-a-sunny-day-41221-large.mp4" type="video/mp4" />
-        </video>
+    <div className="min-h-screen flex bg-background">
+      {/* Visual Side */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-black">
+        {loginImage && (
+          <Image 
+            src={loginImage.imageUrl} 
+            alt={loginImage.description} 
+            fill 
+            className="object-cover opacity-70"
+            data-ai-hint={loginImage.imageHint}
+            priority
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent" />
         <div className="relative z-10 p-20 flex flex-col justify-end text-white">
-          <h2 className="text-6xl font-extrabold leading-tight mb-6">Master the Course.<br /><span className="text-accent italic">Reap the Rewards.</span></h2>
-          <p className="text-xl text-zinc-300 max-w-md">Access your private dashboard to log rounds and track your progress in this month's $10,000 jackpot draw.</p>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center text-white font-bold text-2xl shadow-xl shadow-primary/20">FF</div>
+            <span className="text-4xl font-extrabold tracking-tighter">FairwayFortune</span>
+          </div>
+          <h2 className="text-6xl font-extrabold leading-tight mb-6">Master the Course.<br /><span className="text-accent italic underline decoration-accent/30 underline-offset-8">Reap the Rewards.</span></h2>
+          <p className="text-xl text-zinc-300 max-w-md">Access your private dashboard to log rounds and track your progress in this month's major draw.</p>
         </div>
       </div>
 
       {/* Login Form Side */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-md space-y-8 animate-in fade-in slide-in-from-right-4 duration-1000">
-          <div className="text-center lg:text-left">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-12">
+        <div className="w-full max-w-md space-y-8 animate-in fade-in slide-in-from-right-4 duration-700">
+          <div className="text-center lg:text-left lg:hidden">
             <Link href="/" className="inline-flex items-center gap-2 mb-8 group">
               <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform">FF</div>
               <span className="text-3xl font-bold tracking-tight text-primary">FairwayFortune</span>
             </Link>
-            <h1 className="text-4xl font-bold tracking-tight mb-2">Welcome back</h1>
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-4xl font-bold tracking-tight">Welcome back</h1>
             <p className="text-muted-foreground">Sign in to your subscription to view scores and draws.</p>
           </div>
 
-          <Card className="border-none shadow-2xl bg-white rounded-3xl overflow-hidden">
+          <Card className="border-none shadow-2xl bg-white rounded-[2rem] overflow-hidden">
             <form onSubmit={handleLogin}>
               <CardHeader className="p-8 pb-4">
                 <CardTitle className="text-2xl">Sign In</CardTitle>
@@ -124,7 +141,7 @@ export default function LoginPage() {
                   className="w-full bg-primary hover:bg-primary/90 h-12 rounded-xl text-lg font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]"
                   disabled={isLoading}
                 >
-                  {isLoading ? 'Authenticating...' : 'Sign In'}
+                  {isLoading ? <Loader2 className="animate-spin" /> : 'Sign In'}
                 </Button>
               </CardContent>
             </form>
@@ -138,8 +155,8 @@ export default function LoginPage() {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 w-full">
-                <Button variant="outline" className="h-12 rounded-xl font-bold border-secondary hover:bg-secondary/20">Google</Button>
-                <Button variant="outline" className="h-12 rounded-xl font-bold border-secondary hover:bg-secondary/20">Apple</Button>
+                <Button variant="outline" className="h-12 rounded-xl font-bold border-secondary hover:bg-secondary/20 transition-colors">Google</Button>
+                <Button variant="outline" className="h-12 rounded-xl font-bold border-secondary hover:bg-secondary/20 transition-colors">Apple</Button>
               </div>
               <p className="text-center text-sm text-muted-foreground">
                 New to the platform? <Link href="/signup" className="text-primary hover:underline font-bold">Create an account</Link>

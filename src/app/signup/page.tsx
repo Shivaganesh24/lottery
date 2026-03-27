@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +14,8 @@ import { useAuth, useFirestore, useUser } from '@/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { ShieldAlert } from 'lucide-react';
+import { ShieldAlert, Loader2 } from 'lucide-react';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -29,6 +31,8 @@ export default function SignupPage() {
   const { user } = useUser();
   const router = useRouter();
   const { toast } = useToast();
+
+  const signupImage = PlaceHolderImages.find(img => img.id === 'signup-visual');
 
   useEffect(() => {
     setMounted(true);
@@ -94,14 +98,18 @@ export default function SignupPage() {
   };
 
   if (!mounted) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen flex bg-black">
+    <div className="min-h-screen flex bg-background">
       {/* Form Side */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-md space-y-8 animate-in fade-in slide-in-from-left-4 duration-1000">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-12">
+        <div className="w-full max-w-md space-y-8 animate-in fade-in slide-in-from-left-4 duration-700">
           <div className="text-center lg:text-left">
             <Link href="/" className="inline-flex items-center gap-2 mb-8 group">
               <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-bold text-xl group-hover:scale-110 transition-transform">FF</div>
@@ -111,7 +119,7 @@ export default function SignupPage() {
             <p className="text-muted-foreground">Start turning your golf scores into charitable winnings.</p>
           </div>
 
-          <Card className="border-none shadow-2xl bg-white rounded-3xl overflow-hidden">
+          <Card className="border-none shadow-2xl bg-white rounded-[2rem] overflow-hidden">
             <form onSubmit={handleSignup}>
               <CardHeader className="p-8 pb-4">
                 <CardTitle className="text-2xl">Sign Up</CardTitle>
@@ -194,7 +202,7 @@ export default function SignupPage() {
                   className="w-full bg-primary hover:bg-primary/90 h-12 rounded-xl text-lg font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] mt-2"
                   disabled={isLoading}
                 >
-                  {isLoading ? 'Creating Account...' : 'Get Started'}
+                  {isLoading ? <Loader2 className="animate-spin" /> : 'Get Started'}
                 </Button>
               </CardContent>
             </form>
@@ -207,20 +215,25 @@ export default function SignupPage() {
         </div>
       </div>
 
-      {/* Visual Side with Video Background */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover opacity-80"
-        >
-          <source src="https://assets.mixkit.co/videos/preview/mixkit-golf-ball-rolling-into-the-hole-in-the-green-grass-41220-large.mp4" type="video/mp4" />
-        </video>
-        <div className="absolute inset-0 bg-gradient-to-l from-black/60 to-transparent" />
+      {/* Visual Side */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-black">
+        {signupImage && (
+          <Image 
+            src={signupImage.imageUrl} 
+            alt={signupImage.description} 
+            fill 
+            className="object-cover opacity-80"
+            data-ai-hint={signupImage.imageHint}
+            priority
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-l from-black/70 to-transparent" />
         <div className="relative z-10 p-20 flex flex-col justify-end text-white text-right w-full">
-          <h2 className="text-6xl font-extrabold leading-tight mb-6">Play with Purpose.<br /><span className="text-accent italic">Win for All.</span></h2>
+          <div className="flex items-center justify-end gap-3 mb-6">
+            <span className="text-4xl font-extrabold tracking-tighter">FairwayFortune</span>
+            <div className="w-12 h-12 rounded-2xl bg-accent flex items-center justify-center text-white font-bold text-2xl shadow-xl shadow-accent/20">FF</div>
+          </div>
+          <h2 className="text-6xl font-extrabold leading-tight mb-6">Play with Purpose.<br /><span className="text-accent italic underline decoration-accent/30 underline-offset-8">Win for All.</span></h2>
           <p className="text-xl text-zinc-300 max-w-md ml-auto">Join thousands of golfers worldwide who are turning their game into a powerful tool for global charitable impact.</p>
         </div>
       </div>
