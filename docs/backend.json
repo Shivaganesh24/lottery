@@ -1,0 +1,582 @@
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Stores user-specific information and preferences for the golf platform, excluding authentication credentials which are managed externally.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address, primarily for identification purposes. Assumes authentication is handled by an external system.",
+          "format": "email"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the user."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the user."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the user within the application, e.g., 'user' or 'admin'."
+        },
+        "last5Scores": {
+          "type": "array",
+          "description": "An array storing the user's last 5 Stableford golf scores. Scores must be between 1 and 45. New scores replace the oldest.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "currentSubscriptionId": {
+          "type": "string",
+          "description": "Reference to the user's currently active Subscription. (Relationship: UserProfile 1:1 Subscription)"
+        },
+        "preferredCharityId": {
+          "type": "string",
+          "description": "Reference to the Charity entity that the user prefers to donate to. (Relationship: Charity 1:N UserProfile)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user profile was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the user profile was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "firstName",
+        "lastName",
+        "role",
+        "last5Scores",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SubscriptionPlan": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SubscriptionPlan",
+      "type": "object",
+      "description": "Defines the different subscription plans available to users (e.g., monthly, yearly).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the SubscriptionPlan entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the subscription plan (e.g., 'Monthly Basic', 'Yearly Premium')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the subscription plan's features and benefits."
+        },
+        "price": {
+          "type": "number",
+          "description": "The monetary price of the subscription plan."
+        },
+        "currency": {
+          "type": "string",
+          "description": "The currency in which the subscription plan is priced (e.g., 'USD', 'GBP')."
+        },
+        "durationInMonths": {
+          "type": "number",
+          "description": "The duration of the subscription plan in months (e.g., 1 for monthly, 12 for yearly)."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Indicates whether the subscription plan is currently active and available for purchase."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the subscription plan was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the subscription plan was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "price",
+        "currency",
+        "durationInMonths",
+        "isActive",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Subscription": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Subscription",
+      "type": "object",
+      "description": "Represents an individual user's active or past subscription to a SubscriptionPlan.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Subscription entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile who owns this subscription. (Relationship: UserProfile 1:N Subscription)"
+        },
+        "planId": {
+          "type": "string",
+          "description": "Reference to the SubscriptionPlan this subscription is based on. (Relationship: SubscriptionPlan 1:N Subscription)"
+        },
+        "startDate": {
+          "type": "string",
+          "description": "The date when the subscription became active.",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "The date when the subscription is scheduled to expire or was cancelled.",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the subscription (e.g., 'active', 'cancelled', 'expired', 'pending', 'trial')."
+        },
+        "paymentProviderSubscriptionId": {
+          "type": "string",
+          "description": "An optional identifier from an external payment provider (e.g., Stripe) for this subscription."
+        },
+        "charityContributionPercentage": {
+          "type": "number",
+          "description": "The percentage of the subscription fee designated for charity by the user (minimum 10%)."
+        },
+        "totalAmountContributedToCharity": {
+          "type": "number",
+          "description": "The cumulative amount contributed to charity from this specific subscription instance over its lifetime."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the subscription record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the subscription record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "planId",
+        "startDate",
+        "endDate",
+        "status",
+        "charityContributionPercentage",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Charity": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Charity",
+      "type": "object",
+      "description": "Stores information about charitable organizations that users can choose to support.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Charity entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the charitable organization."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the charity's mission and activities, potentially AI-generated."
+        },
+        "websiteUrl": {
+          "type": "string",
+          "description": "The official website URL of the charity.",
+          "format": "uri"
+        },
+        "logoUrl": {
+          "type": "string",
+          "description": "The URL to the charity's logo image.",
+          "format": "uri"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Indicates whether the charity is currently active and available for user donations."
+        },
+        "totalAmountReceived": {
+          "type": "number",
+          "description": "The cumulative total amount of donations received by this charity through the platform."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the charity record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the charity record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "websiteUrl",
+        "isActive",
+        "totalAmountReceived",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Draw": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Draw",
+      "type": "object",
+      "description": "Represents a monthly prize draw event, including the winning numbers and associated details.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Draw entity."
+        },
+        "drawIdentifier": {
+          "type": "string",
+          "description": "A human-readable identifier for the draw (e.g., '2023-10-MonthlyDraw')."
+        },
+        "drawMonth": {
+          "type": "number",
+          "description": "The month in which the draw took place (1-12)."
+        },
+        "drawYear": {
+          "type": "number",
+          "description": "The year in which the draw took place."
+        },
+        "drawDate": {
+          "type": "string",
+          "description": "The exact date and time when the draw was conducted.",
+          "format": "date-time"
+        },
+        "winningNumbers": {
+          "type": "array",
+          "description": "An array of the 5 random numbers generated for this draw (1-45).",
+          "items": {
+            "type": "number"
+          }
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the draw (e.g., 'pending', 'completed', 'verified', 'cancelled')."
+        },
+        "prizeDescription": {
+          "type": "string",
+          "description": "An overall description of the prizes available for this draw, potentially AI-generated."
+        },
+        "totalCharityContributionFromDraw": {
+          "type": "number",
+          "description": "The total amount contributed to charity from all subscriptions active during this draw's period."
+        },
+        "eligibleUserIds": {
+          "type": "array",
+          "description": "References to UserProfile IDs who were eligible to participate in this draw. (Relationship: UserProfile N:N Draw)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "winnerWinningIds": {
+          "type": "array",
+          "description": "References to Winning IDs awarded in this specific draw. (Relationship: Winning N:N Draw)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the draw record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the draw record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "drawIdentifier",
+        "drawMonth",
+        "drawYear",
+        "drawDate",
+        "winningNumbers",
+        "status",
+        "prizeDescription",
+        "totalCharityContributionFromDraw",
+        "eligibleUserIds",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Prize": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Prize",
+      "type": "object",
+      "description": "Defines a template for a prize that can be won in a draw.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Prize entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the prize (e.g., '5 Score Match Jackpot', '3 Score Match Prize')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the prize, potentially AI-generated."
+        },
+        "value": {
+          "type": "number",
+          "description": "The monetary value or estimated worth of the prize."
+        },
+        "currency": {
+          "type": "string",
+          "description": "The currency in which the prize value is expressed (e.g., 'USD')."
+        },
+        "matchCountRequired": {
+          "type": "number",
+          "description": "The number of matching scores required to win this prize (e.g., 3, 4, 5)."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "The URL to an image representing the prize.",
+          "format": "uri"
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Indicates whether this prize is currently active and can be awarded."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the prize record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the prize record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "value",
+        "currency",
+        "matchCountRequired",
+        "isActive",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Winning": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Winning",
+      "type": "object",
+      "description": "Records an instance of a user winning a specific prize in a particular draw.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Winning entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the UserProfile who won the prize. (Relationship: UserProfile 1:N Winning)"
+        },
+        "drawId": {
+          "type": "string",
+          "description": "Reference to the Draw in which the prize was won. (Relationship: Draw 1:N Winning)"
+        },
+        "prizeId": {
+          "type": "string",
+          "description": "Reference to the Prize entity that was awarded. (Relationship: Prize 1:N Winning)"
+        },
+        "matchCount": {
+          "type": "number",
+          "description": "The number of scores the user matched to win this prize (e.g., 3, 4, 5)."
+        },
+        "winningScores": {
+          "type": "array",
+          "description": "An array of the specific scores from the user's 'last5Scores' that matched the winning numbers in the draw.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "claimStatus": {
+          "type": "string",
+          "description": "The status of the prize claim (e.g., 'pending', 'claimed', 'verified', 'rejected', 'shipped')."
+        },
+        "claimDate": {
+          "type": "string",
+          "description": "The date and time when the user claimed the prize, if applicable.",
+          "format": "date-time"
+        },
+        "verificationDate": {
+          "type": "string",
+          "description": "The date and time when an administrator verified the winning claim.",
+          "format": "date-time"
+        },
+        "adminNotes": {
+          "type": "string",
+          "description": "Optional notes added by an administrator regarding the winning or claim process."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the winning record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the winning record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "drawId",
+        "prizeId",
+        "matchCount",
+        "winningScores",
+        "claimStatus",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Stores individual user profile data. The `userId` in the path must match `request.auth.uid` and the `id` field within the document. This ensures private, user-owned data."
+        }
+      },
+      {
+        "path": "/subscriptionPlans/{subscriptionPlanId}",
+        "definition": {
+          "entityName": "SubscriptionPlan",
+          "schema": {
+            "$ref": "#/backend/entities/SubscriptionPlan"
+          },
+          "description": "Defines available subscription plans. Documents are publicly readable but only editable by administrators."
+        }
+      },
+      {
+        "path": "/users/{userId}/subscriptions/{subscriptionId}",
+        "definition": {
+          "entityName": "Subscription",
+          "schema": {
+            "$ref": "#/backend/entities/Subscription"
+          },
+          "description": "Records a user's specific subscription. The `userId` in the path must match `request.auth.uid` and the `userId` field in the document, ensuring authorization independence.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns the subscription."
+            },
+            {
+              "name": "subscriptionId",
+              "description": "The unique identifier for the specific subscription record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/charities/{charityId}",
+        "definition": {
+          "entityName": "Charity",
+          "schema": {
+            "$ref": "#/backend/entities/Charity"
+          },
+          "description": "Lists charitable organizations available for users to support. Documents are publicly readable but only editable by administrators."
+        }
+      },
+      {
+        "path": "/draws/{drawId}",
+        "definition": {
+          "entityName": "Draw",
+          "schema": {
+            "$ref": "#/backend/entities/Draw"
+          },
+          "description": "Contains details about each monthly prize draw, including winning numbers and eligible users. Documents are generally publicly readable (e.g., after the draw date) and managed by administrators."
+        }
+      },
+      {
+        "path": "/prizes/{prizeId}",
+        "definition": {
+          "entityName": "Prize",
+          "schema": {
+            "$ref": "#/backend/entities/Prize"
+          },
+          "description": "Defines templates for prizes that can be won in draws. Documents are publicly readable but only editable by administrators."
+        }
+      },
+      {
+        "path": "/users/{userId}/winnings/{winningId}",
+        "definition": {
+          "entityName": "Winning",
+          "schema": {
+            "$ref": "#/backend/entities/Winning"
+          },
+          "description": "Records an individual user's prize winning. The `userId` in the path must match `request.auth.uid` and the `userId` field in the document, ensuring authorization independence. Also accessible by administrators for verification and management.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who won the prize."
+            },
+            {
+              "name": "winningId",
+              "description": "The unique identifier for the specific winning record."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/admin_users/{userId}",
+        "definition": {
+          "entityName": "AdminUser",
+          "schema": {
+            "$ref": "#/backend/entities/AdminUser"
+          },
+          "description": "A dedicated top-level collection to store UIDs of administrative users. The existence of a document with a user's `uid` in this collection grants administrative privileges for Firestore security rules, adhering to the DBAC principle (Existence over Content)."
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed following the core principles of Authorization Independence, Structural Segregation, and DBAC, ensuring a secure, scalable, and debuggable database. Authorization Independence is achieved primarily through denormalization: all user-specific subcollection documents (e.g., a user's Subscription or Winning record) explicitly include the `userId` field, which matches the `userId` in the document path. This allows Firestore Security Rules to verify `request.auth.uid == userId` and `request.auth.uid == resource.data.userId` without performing expensive and non-atomic `get()` operations on parent documents. This makes rules clear, robust, and performant, enabling atomic writes.\n\nFor administrative roles, a dedicated top-level collection `/admin_users/{userId}` is used. This adheres to the 'Existence over Content' principle for DBAC (Database-Based Access Control). To grant admin privileges, a document exists in this collection with the admin's `uid` as its ID. Firestore rules can then efficiently check `get(/databases/$(database)/documents/admin_users/$(request.auth.uid)).exists()` for write access to global collections or sensitive user data, again avoiding complex hierarchical `get()` calls.\n\nStructural Segregation is applied by grouping documents with similar security postures into distinct collections. Global entities like `SubscriptionPlans`, `Charities`, `Draws`, and `Prizes` reside in top-level collections, as they are generally publicly readable and only admin-editable. User-specific data (`UserProfile`, `Subscription`, `Winning`) is logically nested under `/users/{userId}/` paths, ensuring private data is isolated and easily secured based on ownership. This separation simplifies security rules by removing the need for complex conditional logic within a single collection.\n\nQAPs (Queries as Policy) are supported inherently by this design. For user-specific data, the path-based authorization (`/users/{userId}/...`) ensures that `list` operations automatically filter by the `request.auth.uid`, making it impossible for a user to inadvertently query data belonging to another user. For global, publicly readable collections (`/subscriptionPlans`, `/charities`, `/draws`, `/prizes`), `list` operations are open to all, and client-side queries can apply additional filters (e.g., `isActive: true`). The security rules are designed to prevent unauthorized write access, but not to filter data for authorized reads, thereby upholding the QAP principle. The `Draw.eligibleUserIds` field, while containing sensitive UIDs, is part of a publicly readable document. If this list itself is considered sensitive until a certain point (e.g., after the draw is finalized), rules would need to specifically allow read only under certain conditions or for specific users; otherwise, it is assumed to be publicly consumable as part of the draw record for transparency."
+  }
+}
