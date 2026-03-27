@@ -21,6 +21,11 @@ export default function Dashboard() {
   const auth = useAuth();
   const db = useFirestore();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const userRef = useMemoFirebase(() => (user ? doc(db, 'users', user.uid) : null), [db, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userRef);
@@ -34,10 +39,10 @@ export default function Dashboard() {
   const [isScoreDialogOpen, setIsScoreDialogOpen] = useState(false);
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
+    if (mounted && !isUserLoading && !user) {
       router.push('/login');
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isUserLoading, router, mounted]);
 
   const handleLogScore = () => {
     const scoreVal = parseInt(newScore);
@@ -63,7 +68,7 @@ export default function Dashboard() {
     router.push('/');
   };
 
-  if (isUserLoading || isProfileLoading) {
+  if (!mounted || isUserLoading || isProfileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse text-primary font-bold">Loading your fairway...</div>

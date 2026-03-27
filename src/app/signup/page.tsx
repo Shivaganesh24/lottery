@@ -21,6 +21,7 @@ export default function SignupPage() {
   const [lastName, setLastName] = useState('');
   const [isAdminRegistration, setIsAdminRegistration] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   
   const auth = useAuth();
   const db = useFirestore();
@@ -29,10 +30,14 @@ export default function SignupPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (user) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (user && mounted) {
       router.push('/dashboard');
     }
-  }, [user, router]);
+  }, [user, router, mounted]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +91,10 @@ export default function SignupPage() {
       setIsLoading(false);
     }
   };
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
