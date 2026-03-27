@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCcw, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
+import { RefreshCcw, Sparkles, AlertCircle, Loader2, UserPlus } from 'lucide-react';
 import { generatePrizeCharityDescription } from '@/ai/flows/admin-prize-charity-description-generator';
 import { useFirestore, useCollection, useDoc, useUser, useMemoFirebase } from '@/firebase';
-import { collection, doc, query, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, writeBatch, increment, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
@@ -35,6 +35,7 @@ export default function AdminPage() {
   const [winningNumbers, setWinningNumbers] = useState<number[] | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExecutingDraw, setIsExecutingDraw] = useState(false);
+  const [isPromoting, setIsPromoting] = useState(false);
   const [aiOutput, setAiOutput] = useState<string>('');
   
   const [prizeForm, setPrizeForm] = useState({
@@ -133,6 +134,30 @@ export default function AdminPage() {
     }
   };
 
+  const handlePromoteToAdmin = async () => {
+    if (!user) return;
+    setIsPromoting(true);
+    try {
+      await setDoc(doc(db, 'admin_users', user.uid), {
+        uid: user.uid,
+        email: user.email,
+        promotedAt: serverTimestamp(),
+      });
+      toast({
+        title: 'Admin Access Granted',
+        description: 'You are now an administrator for FairwayFortune.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Promotion Failed',
+        description: error.message,
+      });
+    } finally {
+      setIsPromoting(false);
+    }
+  };
+
   if (isAdminChecking) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
@@ -153,9 +178,17 @@ export default function AdminPage() {
             <CardTitle>Access Denied</CardTitle>
             <CardDescription>You do not have administrative privileges to access this area.</CardDescription>
           </CardHeader>
-          <CardContent className="flex justify-center">
-            <Link href="/dashboard">
-              <Button variant="outline">Back to Dashboard</Button>
+          <CardContent className="flex flex-col gap-3 justify-center">
+            <Button 
+              className="w-full bg-primary" 
+              onClick={handlePromoteToAdmin}
+              disabled={isPromoting}
+            >
+              {isPromoting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <UserPlus className="mr-2 h-4 w-4" />}
+              Promote Myself to Admin (Dev Only)
+            </Button>
+            <Link href="/dashboard" className="w-full">
+              <Button variant="outline" className="w-full">Back to Dashboard</Button>
             </Link>
           </CardContent>
         </Card>

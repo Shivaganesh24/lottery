@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -13,12 +12,14 @@ import { useAuth, useFirestore, useUser } from '@/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { ShieldAlert } from 'lucide-react';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [isAdminRegistration, setIsAdminRegistration] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
   const auth = useAuth();
@@ -55,15 +56,24 @@ export default function SignupPage() {
         email: email,
         firstName: firstName,
         lastName: lastName,
-        role: 'user',
+        role: isAdminRegistration ? 'admin' : 'user',
         last5Scores: [],
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
+      // If admin registration is checked, create the admin record
+      if (isAdminRegistration) {
+        await setDoc(doc(db, 'admin_users', newUser.uid), {
+          uid: newUser.uid,
+          email: email,
+          promotedAt: serverTimestamp(),
+        });
+      }
+
       toast({
         title: 'Account created!',
-        description: 'Welcome to FairwayFortune.',
+        description: `Welcome to FairwayFortune${isAdminRegistration ? ' (Admin Mode)' : ''}.`,
       });
       router.push('/dashboard');
     } catch (error: any) {
@@ -139,6 +149,26 @@ export default function SignupPage() {
                   required
                 />
               </div>
+
+              <div className="flex items-center space-x-2 pt-2 border-t mt-4 pt-4 border-dashed">
+                <Checkbox 
+                  id="admin-reg" 
+                  checked={isAdminRegistration}
+                  onCheckedChange={(checked) => setIsAdminRegistration(!!checked)}
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <Label 
+                    htmlFor="admin-reg" 
+                    className="text-sm font-medium leading-none flex items-center gap-1.5 text-accent"
+                  >
+                    <ShieldAlert className="h-4 w-4" /> Register as Administrator
+                  </Label>
+                  <p className="text-[10px] text-muted-foreground">
+                    Grants access to run draws and manage platform content (Dev Only).
+                  </p>
+                </div>
+              </div>
+
               <div className="flex items-center space-x-2 pt-2">
                 <Checkbox id="terms" required />
                 <Label htmlFor="terms" className="text-xs text-muted-foreground font-normal leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
