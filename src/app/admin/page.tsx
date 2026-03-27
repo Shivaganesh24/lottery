@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { 
   RefreshCcw, Sparkles, AlertCircle, Loader2, UserPlus, 
   CheckCircle, XCircle, DollarSign, Users, Trophy, 
-  Heart, BarChart3, Settings2, Trash2, Edit, Save, Play, Eye
+  Heart, BarChart3, Settings2, Trash2, Edit, Save, Play, Eye, Plus
 } from 'lucide-react';
 import { generatePrizeCharityDescription } from '@/ai/flows/admin-prize-charity-description-generator';
 import { 
@@ -65,8 +65,10 @@ export default function AdminPage() {
   // Form States
   const [prizeForm, setPrizeForm] = useState({ name: '', value: '', features: '' });
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [editScores, setEditScores] = useState<string>('');
   const [selectedCharity, setSelectedCharity] = useState<any>(null);
   const [isCharityDialogOpen, setIsCharityDialogOpen] = useState(false);
+  const [isUserEditDialogOpen, setIsUserEditDialogOpen] = useState(false);
 
   // Analytics Calculations
   const analytics = useMemo(() => {
@@ -187,6 +189,20 @@ export default function AdminPage() {
     }
   };
 
+  const handleUpdateScores = () => {
+    if (!selectedUser) return;
+    const scoresArray = editScores.split(',').map(s => parseInt(s.trim())).filter(s => !isNaN(s));
+    const formattedScores = scoresArray.map(val => ({ value: val, date: new Date().toISOString() }));
+    
+    updateDocumentNonBlocking(doc(db, 'users', selectedUser.id), {
+      last5Scores: formattedScores.slice(-5),
+      updatedAt: serverTimestamp()
+    });
+    
+    toast({ title: 'Scores Updated', description: `Modified scores for ${selectedUser.firstName}` });
+    setIsUserEditDialogOpen(false);
+  };
+
   if (!mounted || isAdminChecking) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
@@ -229,7 +245,7 @@ export default function AdminPage() {
       <div className="max-w-7xl mx-auto space-y-8">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">FairwayFortune Console</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-primary">FairwayFortune Console</h1>
             <p className="text-muted-foreground">Comprehensive platform management and analytics.</p>
           </div>
           <Link href="/dashboard">
@@ -463,19 +479,30 @@ export default function AdminPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Dialog>
+                          <Dialog open={isUserEditDialogOpen && selectedUser?.id === u.id} onOpenChange={(open) => {
+                            setIsUserEditDialogOpen(open);
+                            if (open) {
+                              setSelectedUser(u);
+                              setEditScores(u.last5Scores?.map((s: any) => typeof s === 'object' ? s.value : s).join(', ') || '');
+                            }
+                          }}>
                             <DialogTrigger asChild>
-                              <Button variant="ghost" size="sm" onClick={() => setSelectedUser(u)}><Edit className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="sm" onClick={() => {
+                                setSelectedUser(u);
+                                setEditScores(u.last5Scores?.map((s: any) => typeof s === 'object' ? s.value : s).join(', ') || '');
+                                setIsUserEditDialogOpen(true);
+                              }}><Edit className="h-4 w-4" /></Button>
                             </DialogTrigger>
                             <DialogContent>
                               <DialogHeader>
                                 <DialogTitle>Edit Profile: {u.firstName}</DialogTitle>
+                                <DialogDescription>Manage user subscription and override golf scores.</DialogDescription>
                               </DialogHeader>
                               <div className="space-y-4 py-4">
                                 <div className="space-y-2">
                                   <Label>Subscription Status</Label>
                                   <select 
-                                    className="w-full p-2 border rounded-md text-sm"
+                                    className="w-full p-2 border rounded-md text-sm bg-background"
                                     defaultValue={u.status}
                                     onChange={(e) => updateDocumentNonBlocking(doc(db, 'users', u.id), { status: e.target.value })}
                                   >
@@ -486,14 +513,21 @@ export default function AdminPage() {
                                 </div>
                                 <div className="space-y-2">
                                   <Label>Override Scores (Last 5)</Label>
-                                  <p className="text-[10px] text-muted-foreground mb-2">Manual score adjustments for verification fixes.</p>
-                                  {/* Simplified score edit for prototype */}
+                                  <p className="text-[10px] text-muted-foreground mb-2">Manual score adjustments for verification fixes. Enter comma-separated numbers (1-45).</p>
                                   <div className="flex gap-2">
-                                    <Input placeholder="Enter score array e.g. 36,34,32" className="text-xs" />
-                                    <Button size="sm">Update</Button>
+                                    <Input 
+                                      placeholder="e.g. 36, 34, 32" 
+                                      className="text-xs" 
+                                      value={editScores}
+                                      onChange={(e) => setEditScores(e.target.value)}
+                                    />
                                   </div>
                                 </div>
                               </div>
+                              <DialogFooter>
+                                <Button variant="outline" onClick={() => setIsUserEditDialogOpen(false)}>Cancel</Button>
+                                <Button onClick={handleUpdateScores}>Update User</Button>
+                              </DialogFooter>
                             </DialogContent>
                           </Dialog>
                         </TableCell>
@@ -591,7 +625,7 @@ export default function AdminPage() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label>Content Type</Label>
-                    <select className="w-full p-2 border rounded-md text-sm">
+                    <select className="w-full p-2 border rounded-md text-sm bg-background">
                       <option value="prize">Monthly Prize</option>
                       <option value="charity">Charity Initiative</option>
                     </select>
@@ -705,25 +739,5 @@ export default function AdminPage() {
         </Tabs>
       </div>
     </div>
-  );
-}
-
-function Plus(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M5 12h14" />
-      <path d="M12 5v14" />
-    </svg>
   );
 }
