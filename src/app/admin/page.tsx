@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { RefreshCcw, Sparkles, AlertCircle, Loader2, UserPlus, CheckCircle, XCircle, Trophy } from 'lucide-react';
+import { RefreshCcw, Sparkles, AlertCircle, Loader2, UserPlus, CheckCircle, XCircle, DollarSign } from 'lucide-react';
 import { generatePrizeCharityDescription } from '@/ai/flows/admin-prize-charity-description-generator';
 import { useFirestore, useCollection, useDoc, useUser, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, writeBatch, increment, serverTimestamp, setDoc, collectionGroup } from 'firebase/firestore';
@@ -61,6 +61,12 @@ export default function AdminPage() {
       const batch = writeBatch(db);
       const drawId = `draw-${Date.now()}`;
       
+      // Calculate prize pool based on active subscribers ($19/mo per user)
+      const activeUsers = users.filter(u => u.status === 'active');
+      const totalPool = activeUsers.length * 19;
+      const charityPool = totalPool * 0.10;
+      const prizePool = totalPool - charityPool;
+
       const drawRef = doc(db, 'draws', drawId);
       batch.set(drawRef, {
         id: drawId,
@@ -70,20 +76,24 @@ export default function AdminPage() {
         drawDate: serverTimestamp(),
         winningNumbers: newWinningNumbers,
         status: 'completed',
+        totalPrizePool: prizePool,
+        totalCharityContribution: charityPool,
         prizeDescription: prizeForm.name || 'Monthly Prize Draw',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
 
-      users.forEach(u => {
-        if (u.status === 'active' && u.last5Scores && u.last5Scores.length === 5) {
-          const matchedScores = u.last5Scores.filter((s: number) => newWinningNumbers.includes(s));
+      activeUsers.forEach(u => {
+        if (u.last5Scores && u.last5Scores.length === 5) {
+          const matchedScores = u.last5Scores.filter((s: any) => newWinningNumbers.includes(typeof s === 'object' ? s.value : s));
           const matches = matchedScores.length;
           
           let prize = 0;
-          if (matches === 3) prize = 50;
-          if (matches === 4) prize = 500;
-          if (matches === 5) prize = 5000;
+          // Logic based on PRD: 5 Match (40%), 4 Match (35%), 3 Match (25%)
+          // For prototype, we use tiered values based on the pool or fixed if pool is small
+          if (matches === 3) prize = Math.max(50, prizePool * 0.25 / 10); // Simulated split
+          if (matches === 4) prize = Math.max(500, prizePool * 0.35 / 5);
+          if (matches === 5) prize = Math.max(5000, prizePool * 0.40);
 
           if (prize > 0) {
             const userRef = doc(db, 'users', u.id);
@@ -98,9 +108,9 @@ export default function AdminPage() {
               userId: u.id,
               userName: `${u.firstName} ${u.lastName}`,
               drawId: drawId,
-              prizeId: 'monthly-prize',
               matchCount: matches,
               winningScores: matchedScores,
+              prizeAmount: Math.round(prize),
               claimStatus: 'pending',
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
@@ -112,7 +122,7 @@ export default function AdminPage() {
       await batch.commit();
       toast({
         title: 'Draw Completed!',
-        description: `Winning numbers: ${newWinningNumbers.join(', ')}`,
+        description: `Winning numbers: ${newWinningNumbers.join(', ')}. Pool: $${Math.round(prizePool)}`,
       });
     } catch (error: any) {
       toast({
@@ -129,10 +139,11 @@ export default function AdminPage() {
     const winningRef = doc(db, `users/${win.userId}/winnings`, win.id);
     updateDocumentNonBlocking(winningRef, {
       claimStatus: approved ? 'verified' : 'rejected',
+      paymentStatus: approved ? 'paid' : 'none',
       verificationDate: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
-    toast({ title: approved ? 'Winner Verified' : 'Winner Rejected' });
+    toast({ title: approved ? 'Winner Verified & Paid' : 'Winner Rejected' });
   };
 
   const handleGenerateAiDescription = async () => {
@@ -209,7 +220,7 @@ export default function AdminPage() {
       <div className="max-w-6xl mx-auto space-y-8">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Admin Control Center</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Admin Control Center</h1>
             <p className="text-muted-foreground">Manage FairwayFortune draws and platform content.</p>
           </div>
           <Link href="/dashboard">
@@ -230,7 +241,7 @@ export default function AdminPage() {
               <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle>Run Monthly Draw</CardTitle>
-                  <CardDescription>Generate new winning numbers and update winnings.</CardDescription>
+                  <CardDescription>Generate new winning numbers and calculate prize splits.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex justify-center gap-3">
@@ -265,7 +276,10 @@ export default function AdminPage() {
                       <div className="flex justify-center py-4"><Loader2 className="animate-spin" /></div>
                     ) : draws?.slice(0, 5).map((draw) => (
                       <div key={draw.id} className="flex justify-between items-center py-2 border-b last:border-0">
-                        <span className="text-sm font-medium">{draw.drawIdentifier}</span>
+                        <div className="space-y-1">
+                          <span className="text-sm font-medium block">{draw.drawIdentifier}</span>
+                          <span className="text-xs text-muted-foreground">Pool: ${Math.round(draw.totalPrizePool || 0)}</span>
+                        </div>
                         <div className="flex gap-1">
                           {draw.winningNumbers.map((n: number, i: number) => (
                             <Badge key={i} variant="outline" className="text-[10px] px-1">{n}</Badge>
@@ -283,14 +297,14 @@ export default function AdminPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Prize Verification</CardTitle>
-                <CardDescription>Approve or reject pending prize claims based on user proof.</CardDescription>
+                <CardDescription>Verify proof and update payout status.</CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>User</TableHead>
-                      <TableHead>Match</TableHead>
+                      <TableHead>Amount</TableHead>
                       <TableHead>Proof</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -302,7 +316,7 @@ export default function AdminPage() {
                     ) : allWinnings?.filter(w => w.claimStatus !== 'verified' && w.claimStatus !== 'rejected').map((win) => (
                       <TableRow key={win.id}>
                         <TableCell className="font-medium">{win.userName || 'Unknown User'}</TableCell>
-                        <TableCell><Badge variant="outline">{win.matchCount} Matches</Badge></TableCell>
+                        <TableCell className="font-bold text-primary">${win.prizeAmount || 0}</TableCell>
                         <TableCell className="text-xs truncate max-w-[150px] text-primary underline">{win.proofUrl || 'No proof yet'}</TableCell>
                         <TableCell><Badge>{win.claimStatus}</Badge></TableCell>
                         <TableCell className="text-right flex justify-end gap-2">
@@ -336,7 +350,7 @@ export default function AdminPage() {
                       <TableHead>Name</TableHead>
                       <TableHead>Subscription</TableHead>
                       <TableHead>Latest Scores</TableHead>
-                      <TableHead>Winnings</TableHead>
+                      <TableHead>Total Winnings</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -350,8 +364,8 @@ export default function AdminPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            {u.last5Scores?.map((s: number, i: number) => (
-                              <Badge key={i} variant="outline" className="text-[10px]">{s}</Badge>
+                            {u.last5Scores?.map((s: any, i: number) => (
+                              <Badge key={i} variant="outline" className="text-[10px]">{typeof s === 'object' ? s.value : s}</Badge>
                             ))}
                           </div>
                         </TableCell>

@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Trophy, Calendar, CreditCard, ChevronRight, Heart, Plus, LogOut, ShieldCheck, Lock, Upload, CheckCircle2, Clock } from 'lucide-react';
-import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, updateDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
+import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { doc, serverTimestamp, collection, query, where } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useAuth } from '@/firebase';
@@ -57,7 +57,7 @@ export default function Dashboard() {
     const scoreVal = parseInt(newScore);
     if (isNaN(scoreVal) || scoreVal < 1 || scoreVal > 45 || !userRef || !userProfile) return;
 
-    if (userProfile.role !== 'admin' && userProfile.status !== 'active') {
+    if (userProfile.status !== 'active') {
       toast({
         variant: 'destructive',
         title: 'Subscription Required',
@@ -67,7 +67,11 @@ export default function Dashboard() {
     }
 
     const currentScores = userProfile.last5Scores || [];
-    const updatedScores = [...currentScores, scoreVal];
+    // Each score is an object with a value and date
+    const scoreObject = { value: scoreVal, date: new Date().toISOString() };
+    const updatedScores = [...currentScores, scoreObject];
+    
+    // Maintain only the last 5 scores as per PRD
     if (updatedScores.length > 5) {
       updatedScores.shift();
     }
@@ -79,7 +83,7 @@ export default function Dashboard() {
 
     setNewScore('');
     setIsScoreDialogOpen(false);
-    toast({ title: 'Score Logged', description: `Score ${scoreVal} added to your round history.` });
+    toast({ title: 'Score Logged', description: `Score ${scoreVal} added with today's date.` });
   };
 
   const handleClaimWinning = (winningId: string) => {
@@ -95,7 +99,7 @@ export default function Dashboard() {
 
     setClaimProof('');
     setActiveWinningId(null);
-    toast({ title: 'Claim Submitted', description: 'Your claim is now pending administrator verification.' });
+    toast({ title: 'Claim Submitted', description: 'Administrator will verify your proof shortly.' });
   };
 
   const handleLogout = async () => {
@@ -110,13 +114,13 @@ export default function Dashboard() {
       role: 'user',
       updatedAt: serverTimestamp(),
     });
-    toast({ title: 'Subscription Active', description: 'Welcome to the Monthly Pro plan!' });
+    toast({ title: 'Subscription Active', description: 'Monthly Pro plan activated!' });
   };
 
   if (!mounted || isUserLoading || isProfileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-primary font-bold">Loading your fairway...</div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -153,9 +157,9 @@ export default function Dashboard() {
       <div className="max-w-7xl mx-auto p-6 lg:p-10 space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Welcome back, {userProfile.firstName}</h1>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
             <p className="text-muted-foreground">
-              {isSubscribed ? 'You are currently entered in the Monthly Draw.' : 'Activate your subscription to enter the next draw.'}
+              Welcome, {userProfile.firstName}. {isSubscribed ? 'Good luck in the next draw!' : 'Join Pro to start winning.'}
             </p>
           </div>
           <div className="flex gap-3">
@@ -181,12 +185,12 @@ export default function Dashboard() {
                       value={newScore}
                       onChange={(e) => setNewScore(e.target.value)}
                     />
-                    <p className="text-xs text-muted-foreground">Stableford points from your latest round. Newest replaces oldest (max 5).</p>
+                    <p className="text-xs text-muted-foreground">Stableford points from your latest round. Only the 5 most recent rounds are saved.</p>
                   </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsScoreDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={handleLogScore}>Submit Score</Button>
+                  <Button onClick={handleLogScore}>Save Score</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -201,11 +205,11 @@ export default function Dashboard() {
                   <Lock className="h-6 w-6 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg">Features Locked</h3>
-                  <p className="text-muted-foreground text-sm">Join the FairwayFortune community to turn your scores into rewards.</p>
+                  <h3 className="font-bold text-lg">Subscription Required</h3>
+                  <p className="text-muted-foreground text-sm">Activate your membership to unlock score entry and monthly prize eligibility.</p>
                 </div>
               </div>
-              <Button onClick={handleSubscribe} className="bg-primary hover:bg-primary/90 px-8">Activate Pro Membership</Button>
+              <Button onClick={handleSubscribe} className="bg-primary hover:bg-primary/90 px-8">Subscribe for $19/mo</Button>
             </CardContent>
           </Card>
         )}
@@ -215,40 +219,40 @@ export default function Dashboard() {
             {!isSubscribed && <div className="absolute inset-0 bg-white/40 backdrop-blur-[2px] z-10 flex items-center justify-center" />}
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Last 5 Scores</CardTitle>
-                <CardDescription>Your qualifying scores for the next monthly draw.</CardDescription>
+                <CardTitle>Recent Scores (Top 5)</CardTitle>
+                <CardDescription>Qualifying Stableford points for the next draw.</CardDescription>
               </div>
-              <Badge variant="secondary" className="bg-accent/10 text-accent hover:bg-accent/20">
-                Stableford Format
+              <Badge variant="secondary" className="bg-accent/10 text-accent">
+                Monthly Active
               </Badge>
             </CardHeader>
             <CardContent>
               <div className="flex items-end gap-2 h-40">
-                {latestScores.map((score: number, i: number) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                    <div 
-                      className="w-full bg-primary/10 rounded-t-md transition-all group-hover:bg-primary/20 relative" 
-                      style={{ height: `${(score / 45) * 100}%` }}
-                    >
-                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white text-xs px-2 py-1 rounded">
-                        {score}
+                {latestScores.map((s: any, i: number) => {
+                  const val = typeof s === 'object' ? s.value : s;
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+                      <div 
+                        className="w-full bg-primary/10 rounded-t-md transition-all group-hover:bg-primary/20 relative" 
+                        style={{ height: `${(val / 45) * 100}%` }}
+                      >
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white text-[10px] px-2 py-1 rounded">
+                          {val}
+                        </div>
                       </div>
+                      <span className="text-[10px] text-muted-foreground font-medium truncate w-full text-center">
+                        {typeof s === 'object' ? new Date(s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : `Rd ${i+1}`}
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground font-medium">Rd {i + 1}</span>
-                  </div>
-                ))}
+                  );
+                })}
                 {Array.from({ length: Math.max(0, 5 - latestScores.length) }).map((_, i) => (
                   <div key={`empty-${i}`} className="flex-1 flex flex-col items-center gap-2">
                     <div className="w-full bg-secondary/30 h-8 rounded-t-md border-2 border-dashed border-muted" />
-                    <span className="text-xs text-muted-foreground font-medium italic">Pending</span>
+                    <span className="text-xs text-muted-foreground font-medium italic">Empty</span>
                   </div>
                 ))}
               </div>
-              {latestScores.length < 5 && isSubscribed && (
-                <div className="mt-6 p-4 rounded-lg bg-secondary/50 border border-dashed text-center">
-                  <p className="text-sm text-muted-foreground">You need {5 - latestScores.length} more scores to qualify for the next draw.</p>
-                </div>
-              )}
             </CardContent>
           </Card>
 
@@ -262,24 +266,12 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm opacity-90">Plan Status</span>
+                  <span className="text-sm opacity-90">Status</span>
                   <Badge className={isSubscribed ? "bg-white text-primary" : "bg-muted text-muted-foreground"}>
-                    {isSubscribed ? 'Active' : 'Inactive'}
+                    {isSubscribed ? 'Pro' : 'Inactive'}
                   </Badge>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm opacity-90">Current Plan</span>
-                  <span className="font-semibold capitalize">{isSubscribed ? 'Monthly Pro' : 'None'}</span>
-                </div>
-                {isSubscribed && (
-                  <div className="pt-2">
-                    <div className="flex justify-between text-xs mb-1 opacity-80">
-                      <span>Renewal Date</span>
-                      <span>Next Month</span>
-                    </div>
-                    <Progress value={80} className="h-1 bg-white/20" />
-                  </div>
-                )}
+                {isSubscribed && <p className="text-xs opacity-80">Renews automatically next month</p>}
               </CardContent>
             </Card>
 
@@ -292,10 +284,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">${userProfile.totalWinnings || 0}</div>
-                <p className="text-xs text-muted-foreground mt-1">Total platform earnings</p>
-                <Button variant="ghost" size="sm" className="w-full mt-4 text-primary hover:text-primary/80">
-                  View History <ChevronRight className="ml-1 h-4 w-4" />
-                </Button>
+                <p className="text-xs text-muted-foreground mt-1">Platform earnings to date</p>
               </CardContent>
             </Card>
           </div>
@@ -306,23 +295,19 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Heart className="h-5 w-5 text-destructive" />
-                Impact Summary
+                Charity Selection
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-3 rounded-lg bg-secondary/30">
                   <div>
-                    <p className="text-sm font-semibold">{selectedCharity?.name || 'Junior Golf Foundation'}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-1">{selectedCharity?.description || 'Empowering youth through sports and education.'}</p>
+                    <p className="text-sm font-semibold">{selectedCharity?.name || 'Search Foundations'}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-1">10% of your fee is donated here.</p>
                   </div>
                   <Button variant="outline" size="sm" asChild>
-                    <Link href="/charities">Change</Link>
+                    <Link href="/charities">Browse</Link>
                   </Button>
-                </div>
-                <div className="text-center py-4">
-                  <span className="text-4xl font-bold text-primary">${((userProfile.totalWinnings || 0) * 0.1).toFixed(2)}</span>
-                  <p className="text-sm text-muted-foreground">Total Generated for Charity</p>
                 </div>
               </div>
             </CardContent>
@@ -332,17 +317,17 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
-                Pending Claims
+                Prize Claims
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {userWinnings?.filter(w => w.claimStatus !== 'verified').map((win, i) => (
+                {userWinnings?.filter(w => w.claimStatus !== 'verified').map((win) => (
                   <div key={win.id} className="flex flex-col gap-3 p-3 border rounded-lg bg-background">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="text-sm font-semibold">{win.matchCount} Matches Found!</p>
-                        <p className="text-xs text-muted-foreground">Draw ID: {win.drawId}</p>
+                        <p className="text-sm font-semibold">${win.prizeAmount} Won!</p>
+                        <p className="text-[10px] text-muted-foreground">Match count: {win.matchCount}</p>
                       </div>
                       <Badge variant={win.claimStatus === 'claimed' ? 'secondary' : 'outline'}>
                         {win.claimStatus}
@@ -351,7 +336,7 @@ export default function Dashboard() {
                     {win.claimStatus === 'pending' && (
                       <div className="flex gap-2">
                         <Input 
-                          placeholder="Link to proof (e.g. scorecard URL)" 
+                          placeholder="Upload proof URL" 
                           className="h-8 text-xs" 
                           value={activeWinningId === win.id ? claimProof : ''}
                           onChange={(e) => {
@@ -366,7 +351,7 @@ export default function Dashboard() {
                 ))}
                 {(!userWinnings || userWinnings.filter(w => w.claimStatus !== 'verified').length === 0) && (
                   <div className="text-center py-8 text-muted-foreground italic text-sm">
-                    No pending prizes to claim.
+                    No active prizes to claim.
                   </div>
                 )}
               </div>
