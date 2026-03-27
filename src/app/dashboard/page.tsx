@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -67,11 +68,9 @@ export default function Dashboard() {
     }
 
     const currentScores = userProfile.last5Scores || [];
-    // Each score is an object with a value and date
     const scoreObject = { value: scoreVal, date: new Date().toISOString() };
     const updatedScores = [...currentScores, scoreObject];
     
-    // Maintain only the last 5 scores as per PRD
     if (updatedScores.length > 5) {
       updatedScores.shift();
     }
