@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Trophy, Calendar, CreditCard, ChevronRight, Heart, Plus, LogOut, ShieldCheck, Lock, Upload, CheckCircle2, Clock } from 'lucide-react';
+import { Trophy, Calendar, CreditCard, ChevronRight, Heart, Plus, LogOut, ShieldCheck, Lock, Upload, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 import { useUser, useFirestore, useDoc, useCollection, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { doc, serverTimestamp, collection, query, where } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
