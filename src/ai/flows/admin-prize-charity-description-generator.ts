@@ -58,7 +58,7 @@ Instructions:
 - Ensure the tone is appropriate for the content type (exciting for prizes, heartfelt and inspiring for charities).
 - The output should be a single, well-structured paragraph or a few short, punchy paragraphs.
 
-{{#if (eq contentType 'prize')}}
+{{#if prizeName}}
 Content Type: Prize
 Prize Name: {{{prizeName}}}
 Estimated Value: {{{value}}}
@@ -67,7 +67,7 @@ Key Features:
 
 Generate an exciting and appealing description for this prize, emphasizing its value and what makes it special. Focus on encouraging participation in the draw.
 
-{{else if (eq contentType 'charity')}}
+{{else}}
 Content Type: Charity Initiative
 Charity Name: {{{charityName}}}
 Mission: {{{mission}}}
